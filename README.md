@@ -1,4 +1,4 @@
-# Recite Agent Skill 🦞🤵
+# Recite Agent Skill 
 
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue.svg)](https://openclaw.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
