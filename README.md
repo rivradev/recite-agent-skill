@@ -21,6 +21,10 @@ Recite allows your AI agent to handle the tedious work of receipt management. It
 ### 1. Get API Key
 Obtain your Recite API key from: [https://recite.rivra.dev/settings/api](https://recite.rivra.dev/settings/api)
 
+- **Generous Free Tier:** Start with **30 free scans** to test your workflow.
+- **No Credit Card Required:** Get your API key instantly without any commitment.
+- **Flexible Pricing:** Pay-as-you-go (Credit-based) or high-value annual passes are available for heavy automated workflows.
+
 ### 2. Configure
 Set your API key in your environment or a config file:
 - **Env:** `export RECITE_API_KEY="re_live_..."`
