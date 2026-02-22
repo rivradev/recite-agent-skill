@@ -47,4 +47,4 @@ The skill maintains a local ledger with the following columns:
 `Date`, `Vendor`, `Total`, `Currency`, `Category`, `Subtotal`, `Tax`, `Tip`, `Fees`, `Discounts`, `Description`, `PaymentMethod`, `Confidence`, `ScanID`, `OriginalFilename`, `NewFilename`.
 
 ## 📜 License
-MIT License. Created by [Gavin J. (@RivraDev)](https://x.com/RivraDev).
+MIT License. Created by [Gavin Jun (@RivraDev)](https://x.com/RivraDev).
