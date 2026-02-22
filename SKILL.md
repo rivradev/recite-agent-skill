@@ -1,5 +1,5 @@
 name: recite
-description: AI-powered receipt scanning and bookkeeping. Automates receipt renaming and transaction logging using Recite API.
+description: AI receipt scanner & bookkeeping automation. Process receipts, invoices, and PDFs. Extracts data to rename files and log transactions/expenses to CSV. Perfect for tax & accounting.
 ---
 
 # Recite 🦞🤵
