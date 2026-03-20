@@ -78,7 +78,13 @@ class ReciteClient:
             ".webp": "image/webp",
             ".gif":  "image/gif",
         }
-        mime = mime_map.get(ext, "image/jpeg")
+        if ext not in mime_map:
+            supported = ", ".join(sorted(mime_map))
+            raise ValueError(
+                f"Unsupported file extension '{ext or '[none]'}'. "
+                f"Supported extensions: {supported}"
+            )
+        mime = mime_map[ext]
         with open(file_path, "rb") as f:
             encoded = base64.b64encode(f.read()).decode("utf-8")
         return f"data:{mime};base64,{encoded}"

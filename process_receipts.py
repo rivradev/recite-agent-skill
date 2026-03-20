@@ -18,6 +18,7 @@ import glob
 import json
 import os
 import re
+import requests
 import sys
 import tempfile
 import time
@@ -88,17 +89,34 @@ def output_json(data: object) -> None:
     print(json.dumps(data, indent=2, default=str))
 
 
-def output_error(error: ReciteError) -> None:
-    """Print a ReciteError as a structured JSON error object."""
-    output_json({
+def output_failure(
+    code: str,
+    message: str,
+    details: dict | None = None,
+    http_status: int | None = None,
+) -> None:
+    """Print a structured JSON error object to stdout."""
+    payload = {
         "success": False,
         "error": {
-            "code":    error.code,
-            "message": error.message,
-            "details": error.details,
+            "code": code,
+            "message": message,
+            "details": details or {},
         },
-        "http_status": error.status,
-    })
+    }
+    if http_status is not None:
+        payload["http_status"] = http_status
+    output_json(payload)
+
+
+def output_error(error: ReciteError) -> None:
+    """Print a ReciteError as a structured JSON error object."""
+    output_failure(
+        code=error.code,
+        message=error.message,
+        details=error.details,
+        http_status=error.status,
+    )
 
 
 # ─── CSV Helpers (used by scan-dir) ──────────────────────────────────────────
@@ -407,9 +425,13 @@ def cmd_transaction_get(args: argparse.Namespace, client: ReciteClient) -> None:
 def cmd_transaction_create(args: argparse.Namespace, client: ReciteClient) -> None:
     """Manually create a transaction record."""
     extra = _parse_kv_list(args.extra or [])
+    try:
+        total = float(args.total)
+    except ValueError as exc:
+        raise ValueError(f"Invalid total '{args.total}'. Expected a numeric amount.") from exc
     output_json(client.create_transaction(
         vendor=args.vendor,
-        total=float(args.total),
+        total=total,
         date=args.date,
         currency=args.currency or "USD",
         category=args.category,
@@ -438,13 +460,15 @@ def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
     The JSON file must contain either a list of transaction objects or an object
     with a "transactions" key containing the list.
     """
-    with open(args.file, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(args.file, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in import file: {exc.msg}") from exc
     if isinstance(data, dict) and "transactions" in data:
         data = data["transactions"]
     if not isinstance(data, list):
-        print(json.dumps({"error": "JSON file must contain a list of transaction objects."}))
-        sys.exit(1)
+        raise ValueError("JSON file must contain a list of transaction objects.")
     output_json(client.import_transactions(data))
 
 
@@ -595,9 +619,11 @@ def _parse_kv_list(pairs: list[str]) -> dict:
     """Convert ['key=value', ...] into {'key': 'value', ...}."""
     result = {}
     for pair in pairs:
+        if "=" not in pair:
+            raise ValueError(f"Invalid field '{pair}'. Expected key=value format.")
         k, _, v = pair.partition("=")
         if not k:
-            continue
+            raise ValueError(f"Invalid field '{pair}': empty key.")
         # Auto-convert numeric strings to numbers for clean JSON payloads
         if v.lstrip("-").replace(".", "", 1).isdigit():
             result[k] = float(v) if "." in v else int(v)
@@ -879,6 +905,12 @@ def main() -> None:
         COMMAND_MAP[args.command](args, client)
     except ReciteError as e:
         output_error(e)
+        sys.exit(1)
+    except ValueError as e:
+        output_failure("INVALID_INPUT", str(e))
+        sys.exit(1)
+    except requests.RequestException as e:
+        output_failure("REQUEST_FAILED", str(e))
         sys.exit(1)
     except FileNotFoundError as e:
         output_json({"error": f"File not found: {e.filename}"})
