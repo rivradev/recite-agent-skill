@@ -9,7 +9,8 @@ The skill exposes the full Recite public API via a single CLI entry point.
 |------|------|
 | `process_receipts.py` | Main CLI — all subcommands |
 | `recite_client.py` | API client module (do not call directly) |
-| `long_term_memory.md` | Persistent user rules — always read before acting |
+| `long_term_memory.md` | Persistent user rules — git-ignored, user-local only |
+| `long_term_memory.example.md` | Starter template for the above |
 | `bookkeeping_transactions.CSV` | Ledger generated in the scanned folder |
 
 ---
@@ -90,8 +91,9 @@ python skills/recite/process_receipts.py rule-create \
 ## 🤖 Operation Guidelines
 
 ### 1. Read Long-Term Memory First
-`scan-dir` always prints `long_term_memory.md` to stdout at startup.
-Read it and apply every rule before acting on the scan output.
+Before running `scan-dir`, check if `long_term_memory.md` exists in the skill folder.
+- **Exists:** `scan-dir` prints it to stdout — read and apply every rule before acting on the output.
+- **Missing:** copy `long_term_memory.example.md` → `long_term_memory.md` (or create a blank one) and inform the user. The script runs normally either way.
 
 ### 2. Prefer Batch for Large Directories
 For > 5 files, use `batch` + `batch-wait` instead of looping `scan` calls.

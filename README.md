@@ -40,7 +40,7 @@ pip install requests
 If you are an AI agent, follow these steps to process receipts for your user:
 
 1. **Verify Key:** Ensure `RECITE_API_KEY` is available.
-2. **Read LTM:** Read `skills/recite/long_term_memory.md` for user-specific rules **before** running the script. The script prints the LTM at startup — review and apply those instructions.
+2. **Read LTM:** Check if `skills/recite/long_term_memory.md` exists. If it does, the script prints it at startup — review and apply those instructions. If it doesn't exist, copy `skills/recite/long_term_memory.example.md` to `skills/recite/long_term_memory.md` first (the file is git-ignored and must be created locally).
 3. **Execute:** Run the processing script:
    ```bash
    python skills/recite/process_receipts.py <path_to_receipts_folder> skills/recite/
