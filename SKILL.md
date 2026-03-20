@@ -36,7 +36,8 @@ pip install requests
 |------|---------|
 | `process_receipts.py` | Main CLI — all subcommands |
 | `recite_client.py` | API client module (imported by the CLI) |
-| `long_term_memory.md` | Persistent agent instructions |
+| `long_term_memory.md` | Persistent agent instructions (user-local, git-ignored) |
+| `long_term_memory.example.md` | Template for the above — copy to `long_term_memory.md` to get started |
 | `bookkeeping_transactions.CSV` | Generated ledger (in your target folder) |
 
 ---
@@ -69,7 +70,10 @@ The CSV ledger auto-expands when the API returns new fields. Existing rows are n
 
 ### 7. Apply Long-Term Memory Rules
 
-`scan-dir` prints `long_term_memory.md` to stdout at startup. Always read and apply those rules before acting on the output (e.g., custom categorization, amount alerts, file-move instructions).
+Before running `scan-dir`, check whether `long_term_memory.md` exists in the skill folder.
+
+- **If it exists:** `scan-dir` will print its contents to stdout — read and apply every rule before acting on the output (e.g., custom categorization, amount alerts, file-move instructions).
+- **If it does not exist:** copy `long_term_memory.example.md` to `long_term_memory.md` (or create a blank one) and notify the user that no custom rules are active yet. The script runs normally regardless — a missing file produces no error.
 
 ---
 
@@ -266,7 +270,15 @@ Returns remaining scan quota, daily/hourly request counts, and plan limits.
 
 ## Long-Term Memory & Custom Logic
 
-Edit `long_term_memory.md` to add persistent rules for the agent. The script prints this file to stdout on every `scan-dir` run — the calling agent should read and apply the rules.
+`long_term_memory.md` is **git-ignored** — it lives only on each user's machine and is never overwritten by `git pull`. A starter template is provided as `long_term_memory.example.md`.
+
+**First-time setup:**
+```bash
+cp long_term_memory.example.md long_term_memory.md
+# then edit long_term_memory.md with your own rules
+```
+
+The script prints the file to stdout on every `scan-dir` run — the calling agent should read and apply the rules. If the file is absent the script runs normally (no error).
 
 **Examples:**
 ```markdown
