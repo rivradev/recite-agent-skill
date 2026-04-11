@@ -278,6 +278,9 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
             result = client.scan_file(
                 file_path,
                 project_id=getattr(args, "project_id", None),
+                format=getattr(args, "format", None),
+                auto_create_transaction=getattr(args, "auto_create_transaction", None),
+                confidence_threshold=getattr(args, "confidence_threshold", None),
             )
         except ReciteError as e:
             print(f"  Error ({e.code}): {e.message}")
@@ -326,6 +329,23 @@ def cmd_scan(args: argparse.Namespace, client: ReciteClient) -> None:
     result = client.scan_file(
         args.file,
         project_id=getattr(args, "project_id", None),
+        format=getattr(args, "format", None),
+        auto_create_transaction=getattr(args, "auto_create_transaction", None),
+        confidence_threshold=getattr(args, "confidence_threshold", None),
+    )
+    output_json(result)
+
+
+# ─── Subcommand: scan-url ─────────────────────────────────────────────────────
+
+def cmd_scan_url(args: argparse.Namespace, client: ReciteClient) -> None:
+    """Scan a receipt image URL and print the full API response as JSON."""
+    result = client.scan_url(
+        args.url,
+        project_id=getattr(args, "project_id", None),
+        format=getattr(args, "format", None),
+        auto_create_transaction=getattr(args, "auto_create_transaction", None),
+        confidence_threshold=getattr(args, "confidence_threshold", None),
     )
     output_json(result)
 
@@ -339,7 +359,13 @@ def cmd_scan_text(args: argparse.Namespace, client: ReciteClient) -> None:
     else:
         with open(args.file, encoding="utf-8") as f:
             text = f.read()
-    result = client.scan_text(text, project_id=getattr(args, "project_id", None))
+    result = client.scan_text(
+        text,
+        project_id=getattr(args, "project_id", None),
+        format=getattr(args, "format", None),
+        auto_create_transaction=getattr(args, "auto_create_transaction", None),
+        confidence_threshold=getattr(args, "confidence_threshold", None),
+    )
     output_json(result)
 
 
@@ -353,9 +379,9 @@ def cmd_get_scan(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: batch ────────────────────────────────────────────────────────
 
 def cmd_batch(args: argparse.Namespace, client: ReciteClient) -> None:
-    """Submit up to 20 files for asynchronous batch scanning."""
+    """Submit up to 20 files or URLs for asynchronous batch scanning."""
     if len(args.files) > 20:
-        print(f"  Warning: Only the first 20 of {len(args.files)} files will be submitted.", file=sys.stderr)
+        print(f"  Warning: Only the first 20 of {len(args.files)} items will be submitted.", file=sys.stderr)
     result = client.create_batch(args.files, project_id=getattr(args, "project_id", None))
     output_json(result)
 
@@ -455,21 +481,29 @@ def cmd_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> No
 # ─── Subcommand: import ───────────────────────────────────────────────────────
 
 def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
-    """Bulk-import up to 500 transactions from a JSON file.
+    """Bulk-import up to 500 transactions from a JSON or CSV file.
 
     The JSON file must contain either a list of transaction objects or an object
     with a "transactions" key containing the list.
+    For CSV, pass --format csv or use a file with a .csv extension.
     """
-    try:
+    is_csv = getattr(args, "format", None) == "csv" or args.file.lower().endswith(".csv")
+
+    if is_csv:
         with open(args.file, encoding="utf-8") as f:
-            data = json.load(f)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Invalid JSON in import file: {exc.msg}") from exc
-    if isinstance(data, dict) and "transactions" in data:
-        data = data["transactions"]
-    if not isinstance(data, list):
-        raise ValueError("JSON file must contain a list of transaction objects.")
-    output_json(client.import_transactions(data))
+            data = f.read()
+        output_json(client.import_csv(data))
+    else:
+        try:
+            with open(args.file, encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in import file: {exc.msg}") from exc
+        if isinstance(data, dict) and "transactions" in data:
+            data = data["transactions"]
+        if not isinstance(data, list):
+            raise ValueError("JSON file must contain a list of transaction objects.")
+        output_json(client.import_transactions(data))
 
 
 # ─── Subcommand: summary ──────────────────────────────────────────────────────
@@ -659,18 +693,40 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Skill folder path (used to locate long_term_memory.md)")
     p.add_argument("--project-id", dest="project_id",
                    help="Assign all scans to this Recite project ID")
+    p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
+    p.add_argument("--auto-create-transaction", action="store_true", default=None,
+                   help="Auto-create a transaction if confidence meets threshold")
+    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
 
     # ── scan ──────────────────────────────────────────────────────────────────
     p = sub.add_parser("scan", help="Scan a single receipt file → JSON")
     p.add_argument("file",        help="Path to image (.jpg/.png) or PDF")
     p.add_argument("--project-id", dest="project_id",
                    help="Assign scan to this project")
+    p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
+    p.add_argument("--auto-create-transaction", action="store_true", default=None,
+                   help="Auto-create a transaction if confidence meets threshold")
+    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
+
+    # ── scan-url ──────────────────────────────────────────────────────────────
+    p = sub.add_parser("scan-url", help="Scan a receipt image URL → JSON")
+    p.add_argument("url",         help="URL of the image or PDF")
+    p.add_argument("--project-id", dest="project_id",
+                   help="Assign scan to this project")
+    p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
+    p.add_argument("--auto-create-transaction", action="store_true", default=None,
+                   help="Auto-create a transaction if confidence meets threshold")
+    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
 
     # ── scan-text ─────────────────────────────────────────────────────────────
     p = sub.add_parser("scan-text",
                        help="Scan raw receipt text from a file (or stdin with '-') → JSON")
     p.add_argument("file",        help="Text file path, or '-' to read from stdin")
     p.add_argument("--project-id", dest="project_id")
+    p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
+    p.add_argument("--auto-create-transaction", action="store_true", default=None,
+                   help="Auto-create a transaction if confidence meets threshold")
+    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
 
     # ── get-scan ──────────────────────────────────────────────────────────────
     p = sub.add_parser("get-scan", help="Retrieve a previous scan by ID → JSON")
@@ -678,8 +734,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── batch ─────────────────────────────────────────────────────────────────
     p = sub.add_parser("batch",
-                       help="Submit up to 20 receipt files for async batch scanning → JSON")
-    p.add_argument("files",       nargs="+", help="File paths to scan (max 20)")
+                       help="Submit up to 20 receipt files or URLs for async batch scanning → JSON")
+    p.add_argument("files",       nargs="+", help="File paths or URLs to scan (max 20)")
     p.add_argument("--project-id", dest="project_id")
 
     # ── batch-status ──────────────────────────────────────────────────────────
@@ -739,8 +795,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── import ────────────────────────────────────────────────────────────────
     p = sub.add_parser("import",
-                       help="Bulk-import up to 500 transactions from a JSON file → JSON")
-    p.add_argument("file",         help="JSON file: a list [] or {\"transactions\": [...]}")
+                       help="Bulk-import up to 500 transactions from a JSON or CSV file → JSON")
+    p.add_argument("file",         help="JSON or CSV file. For JSON: a list [] or {\"transactions\": [...]}")
+    p.add_argument("--format",     choices=["json", "csv"], help="Format of the file ('json', 'csv')")
 
     # ── summary ───────────────────────────────────────────────────────────────
     p = sub.add_parser("summary", help="Get aggregate financial statistics → JSON")
@@ -844,6 +901,7 @@ def build_parser() -> argparse.ArgumentParser:
 COMMAND_MAP = {
     "scan-dir":            cmd_scan_dir,
     "scan":                cmd_scan,
+    "scan-url":            cmd_scan_url,
     "scan-text":           cmd_scan_text,
     "get-scan":            cmd_get_scan,
     "batch":               cmd_batch,

@@ -95,11 +95,14 @@ Backward-compatible: `python process_receipts.py <directory>` still triggers `sc
 ```bash
 # Scan an entire folder (original bookkeeping workflow)
 python process_receipts.py scan-dir ./receipts/ skills/recite/
-python process_receipts.py scan-dir ./receipts/ skills/recite/ --project-id proj_abc
+python process_receipts.py scan-dir ./receipts/ skills/recite/ --project-id proj_abc --auto-create-transaction --confidence-threshold 0.8
 
 # Scan a single file → JSON
 python process_receipts.py scan receipt.jpg
-python process_receipts.py scan invoice.pdf --project-id proj_abc
+python process_receipts.py scan invoice.pdf --project-id proj_abc --format json
+
+# Scan a URL → JSON
+python process_receipts.py scan-url https://example.com/receipt.jpg --auto-create-transaction
 
 # Scan from plain text (e.g. email body copy-pasted to a file)
 python process_receipts.py scan-text receipt.txt
@@ -112,8 +115,8 @@ python process_receipts.py get-scan scan_abc123
 ### Batch Scanning (Async)
 
 ```bash
-# Submit up to 20 files for async processing
-python process_receipts.py batch img1.jpg img2.png invoice.pdf
+# Submit up to 20 files or URLs for async processing
+python process_receipts.py batch img1.jpg https://example.com/receipt.png invoice.pdf
 
 # Check status (pending | processing | completed | failed)
 python process_receipts.py batch-status batch_xyz
@@ -152,11 +155,13 @@ python process_receipts.py transaction-delete tx_abc123
 ### Bulk Import
 
 ```bash
-# Import up to 500 transactions from a JSON file
+# Import up to 500 transactions from a JSON or CSV file
 python process_receipts.py import transactions.json
+python process_receipts.py import transactions.csv
 ```
 
 The JSON file must be a list `[{...}, ...]` or `{"transactions": [{...}, ...]}`. Each object should include at minimum `vendor`, `total`, and `date`.
+For CSV, pass `--format csv` or use a file with a `.csv` extension. It must contain the columns `vendor`, `total`, and `date`.
 
 ### Financial Summary & Analytics
 
