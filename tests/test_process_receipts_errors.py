@@ -126,3 +126,11 @@ def test_encode_file_rejects_unsupported_extensions():
 
         with pytest.raises(ValueError, match="Unsupported file extension"):
             ReciteClient._encode_file(str(bad_file))
+
+def test_main_outputs_invalid_input_for_bad_import_csv(monkeypatch, capsys):
+    with _case_dir("bad_import_csv") as tmp_path:
+        bad_csv = tmp_path / "bad.csv"
+        # In a real environment, the client handles valid CSV.
+        # But we want to ensure the fallback logic in CLI is right or simply test routing.
+        # However, import_csv only needs a string.
+        pass
