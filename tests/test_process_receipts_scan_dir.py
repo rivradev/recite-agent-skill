@@ -16,7 +16,7 @@ class FakeReciteClient:
         self.result = result
         self.calls = []
 
-    def scan_file(self, file_path, project_id=None):
+    def scan_file(self, file_path, project_id=None, format=None, auto_create_transaction=None, confidence_threshold=None):
         self.calls.append((file_path, project_id))
         return self.result
 

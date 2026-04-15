@@ -96,6 +96,8 @@ class ReciteClient:
         file_path: str,
         project_id: Optional[str] = None,
         format: Optional[str] = None,
+        auto_create_transaction: Optional[bool] = None,
+        confidence_threshold: Optional[float] = None,
     ) -> Dict:
         """POST /scan — Extract structured data from a receipt image or PDF.
 
@@ -103,6 +105,8 @@ class ReciteClient:
             file_path:  Local path to a .jpg, .jpeg, .png, or .pdf file.
             project_id: Optional Recite project to assign this scan to.
             format:     Response format hint ('json', 'csv', 'text').
+            auto_create_transaction: Auto-create a transaction if confidence meets threshold.
+            confidence_threshold: The confidence threshold.
 
         Returns:
             Full API response dict with success, data, and meta fields.
@@ -112,22 +116,69 @@ class ReciteClient:
             payload["project_id"] = project_id
         if format:
             payload["format"] = format
+        if auto_create_transaction is not None:
+            payload["auto_create_transaction"] = auto_create_transaction
+        if confidence_threshold is not None:
+            payload["confidence_threshold"] = confidence_threshold
+        return self._request("POST", "/scan", json=payload)
+
+    def scan_url(
+        self,
+        image_url: str,
+        project_id: Optional[str] = None,
+        format: Optional[str] = None,
+        auto_create_transaction: Optional[bool] = None,
+        confidence_threshold: Optional[float] = None,
+    ) -> Dict:
+        """POST /scan — Extract structured data from a receipt image URL.
+
+        Args:
+            image_url:  URL of a .jpg, .jpeg, .png, or .pdf file.
+            project_id: Optional Recite project to assign this scan to.
+            format:     Response format hint ('json', 'csv', 'text').
+            auto_create_transaction: Auto-create a transaction if confidence meets threshold.
+            confidence_threshold: The confidence threshold.
+
+        Returns:
+            Full API response dict with success, data, and meta fields.
+        """
+        payload: Dict[str, Any] = {"image_url": image_url}
+        if project_id:
+            payload["project_id"] = project_id
+        if format:
+            payload["format"] = format
+        if auto_create_transaction is not None:
+            payload["auto_create_transaction"] = auto_create_transaction
+        if confidence_threshold is not None:
+            payload["confidence_threshold"] = confidence_threshold
         return self._request("POST", "/scan", json=payload)
 
     def scan_text(
         self,
         text: str,
         project_id: Optional[str] = None,
+        format: Optional[str] = None,
+        auto_create_transaction: Optional[bool] = None,
+        confidence_threshold: Optional[float] = None,
     ) -> Dict:
         """POST /scan — Extract structured data from raw receipt text.
 
         Args:
             text:       Plain-text representation of a receipt.
             project_id: Optional Recite project to assign this scan to.
+            format:     Response format hint ('json', 'csv', 'text').
+            auto_create_transaction: Auto-create a transaction if confidence meets threshold.
+            confidence_threshold: The confidence threshold.
         """
         payload: Dict[str, Any] = {"text": text}
         if project_id:
             payload["project_id"] = project_id
+        if format:
+            payload["format"] = format
+        if auto_create_transaction is not None:
+            payload["auto_create_transaction"] = auto_create_transaction
+        if confidence_threshold is not None:
+            payload["confidence_threshold"] = confidence_threshold
         return self._request("POST", "/scan", json=payload)
 
     def get_scan(self, scan_id: str) -> Dict:
@@ -142,24 +193,27 @@ class ReciteClient:
 
     def create_batch(
         self,
-        file_paths: List[str],
+        items: List[str],
         project_id: Optional[str] = None,
     ) -> Dict:
-        """POST /batch/scans — Submit up to 20 files for asynchronous processing.
+        """POST /batch/scans — Submit up to 20 items (files or URLs) for asynchronous processing.
 
         The API processes files in the background. Poll get_batch_status() until
         status == 'completed', then call get_batch_results() to retrieve extractions.
 
         Args:
-            file_paths: List of local file paths (max 20; extras are silently dropped).
+            items: List of local file paths or URLs (max 20; extras are silently dropped).
             project_id: Optional project to assign all scans to.
         """
         images = []
-        for fp in file_paths[:20]:
-            images.append({
-                "image_base64": self._encode_file(fp),
-                "filename": os.path.basename(fp),
-            })
+        for item in items[:20]:
+            if item.startswith("http://") or item.startswith("https://"):
+                images.append({"image_url": item})
+            else:
+                images.append({
+                    "image_base64": self._encode_file(item),
+                    "filename": os.path.basename(item),
+                })
         payload: Dict[str, Any] = {"images": images}
         if project_id:
             payload["project_id"] = project_id
@@ -278,6 +332,41 @@ class ReciteClient:
         Requires 'transactions:create' API scope.
         """
         return self._request("POST", "/import/transactions", json={"transactions": transactions})
+
+    def import_csv(self, csv_data: str) -> Dict:
+        """POST /import/transactions — Bulk-create up to 500 transaction records from CSV.
+
+        Args:
+            csv_data: Raw CSV string. Must include at minimum 'vendor', 'total', and 'date' columns.
+
+        Requires 'transactions:create' API scope.
+        """
+        url = f"{BASE_URL}/import/transactions"
+        # use raw requests instead of _request since we need to send raw text with text/csv
+        resp = self._session.request(
+            "POST",
+            url,
+            data=csv_data,
+            headers={"Content-Type": "text/csv"},
+            timeout=60,
+        )
+
+        try:
+            body = resp.json()
+        except ValueError:
+            resp.raise_for_status()
+            return {}
+
+        if not body.get("success", False):
+            err = body.get("error", {})
+            raise ReciteError(
+                code=err.get("code", "UNKNOWN"),
+                message=err.get("message", "Unknown error"),
+                details=err.get("details", {}),
+                status=resp.status_code,
+            )
+
+        return body
 
     # ─── Projects ─────────────────────────────────────────────────────────────
 
