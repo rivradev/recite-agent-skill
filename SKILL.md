@@ -1,5 +1,5 @@
 name: recite
-description: AI receipt scanner & full bookkeeping automation. Scan receipts, manage transactions, run financial analytics, configure automation rules, and export data — all via the Recite API. Supports batch processing, project organization, category/vendor management, and webhook automation.
+description: AI receipt scanner & full bookkeeping automation. Scan receipts, manage transactions, run financial analytics, configure automation rules, and export data — all via the Recite API. Supports batch processing, project organization, category/vendor management, webhook automation, bank statement import, bank transaction management, and receipt-to-bank reconciliation.
 ---
 
 # Recite 🦞🤵
@@ -332,6 +332,70 @@ python process_receipts.py usage
 ```
 
 Returns remaining scan quota, daily/hourly request counts, and plan limits.
+
+---
+
+### Bank Statements
+
+```bash
+# Upload a bank statement CSV
+python process_receipts.py bank-statement-upload statement.csv
+
+# List bank statements
+python process_receipts.py bank-statements
+python process_receipts.py bank-statements --limit 10 --offset 20
+
+# Get a single bank statement
+python process_receipts.py bank-statement-get bs_abc123
+
+# Delete a bank statement
+python process_receipts.py bank-statement-delete bs_abc123
+
+# Export a bank statement to a local CSV file
+python process_receipts.py bank-statement-export bs_abc123 -o bank_txns.csv
+```
+
+### Bank Transactions
+
+```bash
+# List bank transactions (optionally filter by statement)
+python process_receipts.py bank-transactions
+python process_receipts.py bank-transactions --statement-id bs_abc123 --limit 50
+
+# Get a single bank transaction
+python process_receipts.py bank-transaction-get bt_abc123
+
+# Update fields
+python process_receipts.py bank-transaction-update bt_abc123 notes="Cleared"
+
+# Delete a bank transaction
+python process_receipts.py bank-transaction-delete bt_abc123
+```
+
+### Reconciliation
+
+```bash
+# List reconciliation links
+python process_receipts.py reconciliation-links --statement-id bs_abc123
+
+# Manually link a receipt transaction to a bank transaction
+python process_receipts.py reconciliation-link-create --transaction-id tx_abc --bank-transaction-id bt_xyz
+
+# Update a reconciliation link
+python process_receipts.py reconciliation-link-update rl_abc status=confirmed
+
+# Delete a reconciliation link
+python process_receipts.py reconciliation-link-delete rl_abc
+
+# Auto-match transactions for a statement
+python process_receipts.py reconciliation-auto-match bs_abc123
+
+# View reconciliation summary
+python process_receipts.py reconciliation-summary bs_abc123
+
+# Export reconciliation data
+python process_receipts.py reconciliation-export --statement-id bs_abc123 -o recon.csv
+```
 
 ---
 
