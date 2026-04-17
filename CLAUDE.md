@@ -15,20 +15,22 @@ The skill exposes the full Recite public API via a single CLI entry point.
 
 ---
 
-## 🔑 API Key — Check First
+## 🔑 API Key — Check First, Keep In Sync
 
-**Before any operation**, verify the API key is available:
+The CLI resolves the API key in this order:
 
+1. **Config file** `~/.config/recite/config.json` → `{"api_key": "re_live_..."}`
+2. **Environment variable** `RECITE_API_KEY`
+
+If neither is set, the CLI exits with a JSON error. Generate a key at `https://recite.rivra.dev/settings/api`.
+
+Before every operation, verify both sources exist and hold the **same key value**:
 ```bash
-# From environment
-echo $RECITE_API_KEY
-
-# Or from config
 cat ~/.config/recite/config.json
+echo $RECITE_API_KEY
 ```
 
-If missing: stop immediately and tell the user to get a key at `https://recite.rivra.dev/settings/api`
-then set `RECITE_API_KEY` or write `~/.config/recite/config.json` with `{"api_key": "re_live_..."}`.
+**When setting, updating, or removing a key — always update BOTH sources.** See `SKILL.md` → *Setup § 1. API Key* for the full procedure (step-by-step update/removal, edge-case decision table, verification checklist).
 
 ---
 
