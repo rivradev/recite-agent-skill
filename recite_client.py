@@ -19,7 +19,9 @@ BASE_URL = "https://recite.rivra.dev/apiV1/api/v1"
 class ReciteError(Exception):
     """Raised for any non-success response from the Recite API."""
 
-    def __init__(self, code: str, message: str, details: dict = None, status: int = None):
+    def __init__(
+        self, code: str, message: str, details: dict = None, status: int = None
+    ):
         self.code = code
         self.message = message
         self.details = details or {}
@@ -33,22 +35,17 @@ class ReciteClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self._session = requests.Session()
-        self._session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        })
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        )
 
     # ─── Internal ─────────────────────────────────────────────────────────────
 
-    def _request(self, method: str, path: str, **kwargs) -> Dict[str, Any]:
-        """Execute a request and return the parsed response dict.
-
-        Raises ReciteError for API-level failures.
-        Raises requests.HTTPError for unexpected non-JSON responses.
-        """
-        url = f"{BASE_URL}{path}"
-        resp = self._session.request(method, url, timeout=60, **kwargs)
-
+    def _handle_response(self, resp) -> Dict[str, Any]:
+        """Parse a requests.Response, raise ReciteError on failure."""
         try:
             body = resp.json()
         except ValueError:
@@ -66,17 +63,27 @@ class ReciteClient:
 
         return body
 
+    def _request(self, method: str, path: str, **kwargs) -> Dict[str, Any]:
+        """Execute a request and return the parsed response dict.
+
+        Raises ReciteError for API-level failures.
+        Raises requests.HTTPError for unexpected non-JSON responses.
+        """
+        url = f"{BASE_URL}{path}"
+        resp = self._session.request(method, url, timeout=60, **kwargs)
+        return self._handle_response(resp)
+
     @staticmethod
     def _encode_file(file_path: str) -> str:
         """Return a data-URI string for the given image/PDF file."""
         ext = os.path.splitext(file_path)[1].lower()
         mime_map = {
-            ".pdf":  "application/pdf",
-            ".png":  "image/png",
-            ".jpg":  "image/jpeg",
+            ".pdf": "application/pdf",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
             ".jpeg": "image/jpeg",
             ".webp": "image/webp",
-            ".gif":  "image/gif",
+            ".gif": "image/gif",
         }
         if ext not in mime_map:
             supported = ", ".join(sorted(mime_map))
@@ -210,10 +217,12 @@ class ReciteClient:
             if item.startswith("http://") or item.startswith("https://"):
                 images.append({"image_url": item})
             else:
-                images.append({
-                    "image_base64": self._encode_file(item),
-                    "filename": os.path.basename(item),
-                })
+                images.append(
+                    {
+                        "image_base64": self._encode_file(item),
+                        "filename": os.path.basename(item),
+                    }
+                )
         payload: Dict[str, Any] = {"images": images}
         if project_id:
             payload["project_id"] = project_id
@@ -256,14 +265,22 @@ class ReciteClient:
             sort:       Sort field, e.g. 'date', '-date', 'total', '-total'.
         """
         params: Dict[str, Any] = {}
-        if start_date:  params["start_date"]  = start_date
-        if end_date:    params["end_date"]     = end_date
-        if category:    params["category"]     = category
-        if vendor:      params["vendor"]       = vendor
-        if project_id:  params["project_id"]   = project_id
-        if limit:       params["limit"]        = limit
-        if offset:      params["offset"]       = offset
-        if sort:        params["sort"]         = sort
+        if start_date:
+            params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
+        if category:
+            params["category"] = category
+        if vendor:
+            params["vendor"] = vendor
+        if project_id:
+            params["project_id"] = project_id
+        if limit:
+            params["limit"] = limit
+        if offset:
+            params["offset"] = offset
+        if sort:
+            params["sort"] = sort
         return self._request("GET", "/transactions", params=params)
 
     def get_transaction(self, tx_id: str) -> Dict:
@@ -299,9 +316,12 @@ class ReciteClient:
             "date": date,
             "currency": currency,
         }
-        if category:   payload["category"]   = category
-        if project_id: payload["project_id"] = project_id
-        if notes:      payload["notes"]      = notes
+        if category:
+            payload["category"] = category
+        if project_id:
+            payload["project_id"] = project_id
+        if notes:
+            payload["notes"] = notes
         payload.update(extra)
         return self._request("POST", "/transactions", json=payload)
 
@@ -331,7 +351,9 @@ class ReciteClient:
 
         Requires 'transactions:create' API scope.
         """
-        return self._request("POST", "/import/transactions", json={"transactions": transactions})
+        return self._request(
+            "POST", "/import/transactions", json={"transactions": transactions}
+        )
 
     def import_csv(self, csv_data: str) -> Dict:
         """POST /import/transactions — Bulk-create up to 500 transaction records from CSV.
@@ -342,7 +364,6 @@ class ReciteClient:
         Requires 'transactions:create' API scope.
         """
         url = f"{BASE_URL}/import/transactions"
-        # use raw requests instead of _request since we need to send raw text with text/csv
         resp = self._session.request(
             "POST",
             url,
@@ -350,23 +371,7 @@ class ReciteClient:
             headers={"Content-Type": "text/csv"},
             timeout=60,
         )
-
-        try:
-            body = resp.json()
-        except ValueError:
-            resp.raise_for_status()
-            return {}
-
-        if not body.get("success", False):
-            err = body.get("error", {})
-            raise ReciteError(
-                code=err.get("code", "UNKNOWN"),
-                message=err.get("message", "Unknown error"),
-                details=err.get("details", {}),
-                status=resp.status_code,
-            )
-
-        return body
+        return self._handle_response(resp)
 
     # ─── Projects ─────────────────────────────────────────────────────────────
 
@@ -422,10 +427,14 @@ class ReciteClient:
             project_id: Scope analytics to a specific project.
         """
         params: Dict[str, Any] = {}
-        if start_date:  params["start_date"]  = start_date
-        if end_date:    params["end_date"]     = end_date
-        if group_by:    params["group_by"]     = group_by
-        if project_id:  params["project_id"]   = project_id
+        if start_date:
+            params["start_date"] = start_date
+        if end_date:
+            params["end_date"] = end_date
+        if group_by:
+            params["group_by"] = group_by
+        if project_id:
+            params["project_id"] = project_id
         return self._request("GET", "/summary", params=params)
 
     # ─── Webhooks ─────────────────────────────────────────────────────────────
@@ -542,8 +551,10 @@ class ReciteClient:
             color:       Optional hex color code (e.g. '#FF5733') for UI display.
         """
         payload: Dict[str, Any] = {"name": name}
-        if description: payload["description"] = description
-        if color:       payload["color"]       = color
+        if description:
+            payload["description"] = description
+        if color:
+            payload["color"] = color
         return self._request("POST", "/categories", json=payload)
 
     def delete_category(self, name: str) -> Dict:
@@ -573,7 +584,8 @@ class ReciteClient:
             **extra:  Any additional vendor fields accepted by the API.
         """
         payload: Dict[str, Any] = {"name": name}
-        if category: payload["category"] = category
+        if category:
+            payload["category"] = category
         payload.update(extra)
         return self._request("POST", "/vendors", json=payload)
 
@@ -604,10 +616,14 @@ class ReciteClient:
         The response data may contain a 'content' string or a 'url' download link.
         """
         payload: Dict[str, Any] = {"format": format}
-        if start_date:  payload["start_date"]  = start_date
-        if end_date:    payload["end_date"]     = end_date
-        if project_id:  payload["project_id"]   = project_id
-        if category:    payload["category"]     = category
+        if start_date:
+            payload["start_date"] = start_date
+        if end_date:
+            payload["end_date"] = end_date
+        if project_id:
+            payload["project_id"] = project_id
+        if category:
+            payload["category"] = category
         return self._request("POST", "/export", json=payload)
 
     # ─── Usage ────────────────────────────────────────────────────────────────
@@ -618,3 +634,150 @@ class ReciteClient:
         Returns remaining quota, daily/hourly limits, and usage counters.
         """
         return self._request("GET", "/usage")
+
+    # ─── Bank Statements ──────────────────────────────────────────────────
+
+    def upload_bank_statement(self, csv_data: str) -> Dict:
+        """POST /bank-statements — Upload a bank statement CSV file.
+
+        Args:
+            csv_data: Raw CSV string of bank statement transactions.
+        """
+        url = f"{BASE_URL}/bank-statements"
+        resp = self._session.request(
+            "POST",
+            url,
+            data=csv_data,
+            headers={"Content-Type": "text/csv"},
+            timeout=60,
+        )
+        return self._handle_response(resp)
+
+    def list_bank_statements(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Dict:
+        """GET /bank-statements — List uploaded bank statements with pagination."""
+        params: Dict[str, Any] = {}
+        if limit:
+            params["limit"] = limit
+        if offset:
+            params["offset"] = offset
+        return self._request("GET", "/bank-statements", params=params)
+
+    def get_bank_statement(self, statement_id: str) -> Dict:
+        """GET /bank-statements/{id} — Retrieve a single bank statement."""
+        return self._request("GET", f"/bank-statements/{statement_id}")
+
+    def delete_bank_statement(self, statement_id: str) -> Dict:
+        """DELETE /bank-statements/{id} — Delete a bank statement."""
+        return self._request("DELETE", f"/bank-statements/{statement_id}")
+
+    def export_bank_statement(self, statement_id: str) -> Dict:
+        """GET /bank-statements/{id}/export — Export a bank statement as CSV."""
+        return self._request("GET", f"/bank-statements/{statement_id}/export")
+
+    # ─── Bank Transactions ────────────────────────────────────────────────
+
+    def list_bank_transactions(
+        self,
+        statement_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Dict:
+        """GET /bank-transactions — List bank transactions with optional filters."""
+        params: Dict[str, Any] = {}
+        if statement_id:
+            params["statement_id"] = statement_id
+        if limit:
+            params["limit"] = limit
+        if offset:
+            params["offset"] = offset
+        return self._request("GET", "/bank-transactions", params=params)
+
+    def get_bank_transaction(self, tx_id: str) -> Dict:
+        """GET /bank-transactions/{id} — Retrieve a single bank transaction."""
+        return self._request("GET", f"/bank-transactions/{tx_id}")
+
+    def update_bank_transaction(self, tx_id: str, **fields: Any) -> Dict:
+        """PATCH /bank-transactions/{id} — Update one or more fields of a bank transaction."""
+        return self._request("PATCH", f"/bank-transactions/{tx_id}", json=fields)
+
+    def delete_bank_transaction(self, tx_id: str) -> Dict:
+        """DELETE /bank-transactions/{id} — Delete a bank transaction."""
+        return self._request("DELETE", f"/bank-transactions/{tx_id}")
+
+    # ─── Reconciliation ───────────────────────────────────────────────────
+
+    def create_reconciliation_link(
+        self,
+        transaction_id: str,
+        bank_transaction_id: str,
+    ) -> Dict:
+        """POST /reconciliation/links — Link a receipt transaction to a bank transaction."""
+        return self._request(
+            "POST",
+            "/reconciliation/links",
+            json={
+                "transaction_id": transaction_id,
+                "bank_transaction_id": bank_transaction_id,
+            },
+        )
+
+    def list_reconciliation_links(
+        self,
+        statement_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Dict:
+        """GET /reconciliation/links — List reconciliation links with optional filters."""
+        params: Dict[str, Any] = {}
+        if statement_id:
+            params["statement_id"] = statement_id
+        if limit:
+            params["limit"] = limit
+        if offset:
+            params["offset"] = offset
+        return self._request("GET", "/reconciliation/links", params=params)
+
+    def update_reconciliation_link(self, link_id: str, **fields: Any) -> Dict:
+        """PATCH /reconciliation/links/{id} — Update a reconciliation link."""
+        return self._request("PATCH", f"/reconciliation/links/{link_id}", json=fields)
+
+    def delete_reconciliation_link(self, link_id: str) -> Dict:
+        """DELETE /reconciliation/links/{id} — Delete a reconciliation link."""
+        return self._request("DELETE", f"/reconciliation/links/{link_id}")
+
+    def auto_match_reconciliation(self, statement_id: str) -> Dict:
+        """POST /reconciliation/auto-match — Auto-match bank transactions to receipt transactions."""
+        return self._request(
+            "POST",
+            "/reconciliation/auto-match",
+            json={
+                "statement_id": statement_id,
+            },
+        )
+
+    def get_reconciliation_summary(self, statement_id: str) -> Dict:
+        """GET /reconciliation/summary — Get reconciliation summary for a statement."""
+        return self._request(
+            "GET",
+            "/reconciliation/summary",
+            params={
+                "statement_id": statement_id,
+            },
+        )
+
+    def export_reconciliation(
+        self,
+        statement_id: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> Dict:
+        """GET /reconciliation/export — Export reconciliation data."""
+        params: Dict[str, Any] = {}
+        if statement_id:
+            params["statement_id"] = statement_id
+        if format:
+            params["format"] = format
+        return self._request("GET", "/reconciliation/export", params=params)

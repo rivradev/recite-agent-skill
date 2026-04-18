@@ -1,5 +1,5 @@
 name: recite
-description: AI receipt scanner & full bookkeeping automation. Scan receipts, manage transactions, run financial analytics, configure automation rules, and export data — all via the Recite API. Supports batch processing, project organization, category/vendor management, and webhook automation.
+description: AI receipt scanner & full bookkeeping automation. Scan receipts, manage transactions, run financial analytics, configure automation rules, and export data — all via the Recite API. Supports batch processing, project organization, category/vendor management, webhook automation, bank statement import, bank transaction management, and receipt-to-bank reconciliation.
 ---
 
 # Recite 🦞🤵
@@ -13,16 +13,66 @@ Scan receipts, manage transactions, analyze spending, and automate categorizatio
 
 ### 1. API Key
 
-Generate a key at `https://recite.rivra.dev/settings/api`, then configure it one of two ways:
+Generate a key at `https://recite.rivra.dev/settings/api`, then store it in **both** locations so the CLI works regardless of how it is invoked:
 
 ```bash
-# Option A — environment variable
-export RECITE_API_KEY="re_live_YOUR_KEY"
-
-# Option B — config file
+# 1. Config file (primary — checked first by the CLI)
 mkdir -p ~/.config/recite
 echo '{"api_key": "re_live_YOUR_KEY"}' > ~/.config/recite/config.json
+
+# 2. Environment variable (fallback — checked second)
+export RECITE_API_KEY="re_live_YOUR_KEY"
 ```
+
+#### Key Resolution Order
+
+The CLI (`process_receipts.py`) resolves the API key at runtime in this order:
+
+1. **Config file** — `~/.config/recite/config.json` → `{"api_key": "re_live_..."}`
+2. **Environment variable** — `RECITE_API_KEY`
+
+The first source that contains a value wins. If neither is set, the CLI exits with a JSON error.
+
+#### When Setting or Updating the API Key
+
+**CRITICAL: Always update BOTH sources.** Updating only one causes the CLI to use a stale key in certain contexts (e.g., shell scripts that don't inherit the env var, or agents that only read the config file).
+
+Steps to set or rotate the key:
+
+1. Write the new key to `~/.config/recite/config.json`:
+   ```bash
+   mkdir -p ~/.config/recite
+   echo '{"api_key": "re_live_NEW_KEY"}' > ~/.config/recite/config.json
+   ```
+2. Set or update the environment variable in the current session AND in the user's shell profile:
+   ```bash
+   export RECITE_API_KEY="re_live_NEW_KEY"
+   ```
+   Also append the `export` line to the user's shell profile (`~/.bashrc`, `~/.zshrc`, or equivalent) so it persists across sessions.
+3. Verify both sources contain the same key:
+   ```bash
+   cat ~/.config/recite/config.json   # should show the new key
+   echo $RECITE_API_KEY               # should print the new key
+   ```
+4. Confirm the key works by running `usage`:
+   ```bash
+   python process_receipts.py usage
+   ```
+
+#### When the User Asks to "Remove" or "Delete" the Key
+
+Remove from **both** sources:
+1. Delete or clear the config file: `rm ~/.config/recite/config.json` (or set `{"api_key": ""}`).
+2. Unset the env var: `unset RECITE_API_KEY` and remove the `export` line from the shell profile.
+
+#### Edge Cases
+
+| Situation | Action |
+|-----------|--------|
+| Config file exists but env var is empty | CLI uses the config file. Still set the env var to match. |
+| Env var is set but config file is missing | CLI uses the env var. Still create the config file to match. |
+| Both exist but hold **different** keys | CLI uses the **config file** value (source 1). Overwrite whichever is stale so both match. |
+| User provides a key interactively | Write to both sources immediately — do not store only in session memory. |
 
 ### 2. Dependencies
 
@@ -46,7 +96,19 @@ pip install requests
 
 ### 1. Mandatory API Key Pre-check
 
-Before any scanning or data operation, verify a Recite API key is available. If missing, stop and instruct the user to generate one at `https://recite.rivra.dev/settings/api`. Do not proceed without a key.
+Before any scanning or data operation, verify a Recite API key is available **from both sources**. If either source is missing or the values differ, fix it before proceeding.
+
+**Verification checklist (run every time before operations):**
+
+1. Read the config file: `cat ~/.config/recite/config.json`
+2. Read the env var: `echo $RECITE_API_KEY`
+3. Confirm both exist and contain the **same key value**.
+
+If both are missing: stop and instruct the user to generate a key at `https://recite.rivra.dev/settings/api`, then store it in both locations per the Setup section above.
+
+If only one source is set: populate the missing source with the same key value before continuing.
+
+If both exist but differ: the config file value takes precedence at runtime. Update the stale source (usually the env var) to match, then continue.
 
 ### 2. Check API Quota Before Bulk Operations
 
@@ -270,6 +332,70 @@ python process_receipts.py usage
 ```
 
 Returns remaining scan quota, daily/hourly request counts, and plan limits.
+
+---
+
+### Bank Statements
+
+```bash
+# Upload a bank statement CSV
+python process_receipts.py bank-statement-upload statement.csv
+
+# List bank statements
+python process_receipts.py bank-statements
+python process_receipts.py bank-statements --limit 10 --offset 20
+
+# Get a single bank statement
+python process_receipts.py bank-statement-get bs_abc123
+
+# Delete a bank statement
+python process_receipts.py bank-statement-delete bs_abc123
+
+# Export a bank statement to a local CSV file
+python process_receipts.py bank-statement-export bs_abc123 -o bank_txns.csv
+```
+
+### Bank Transactions
+
+```bash
+# List bank transactions (optionally filter by statement)
+python process_receipts.py bank-transactions
+python process_receipts.py bank-transactions --statement-id bs_abc123 --limit 50
+
+# Get a single bank transaction
+python process_receipts.py bank-transaction-get bt_abc123
+
+# Update fields
+python process_receipts.py bank-transaction-update bt_abc123 notes="Cleared"
+
+# Delete a bank transaction
+python process_receipts.py bank-transaction-delete bt_abc123
+```
+
+### Reconciliation
+
+```bash
+# List reconciliation links
+python process_receipts.py reconciliation-links --statement-id bs_abc123
+
+# Manually link a receipt transaction to a bank transaction
+python process_receipts.py reconciliation-link-create --transaction-id tx_abc --bank-transaction-id bt_xyz
+
+# Update a reconciliation link
+python process_receipts.py reconciliation-link-update rl_abc status=confirmed
+
+# Delete a reconciliation link
+python process_receipts.py reconciliation-link-delete rl_abc
+
+# Auto-match transactions for a statement
+python process_receipts.py reconciliation-auto-match bs_abc123
+
+# View reconciliation summary
+python process_receipts.py reconciliation-summary bs_abc123
+
+# Export reconciliation data
+python process_receipts.py reconciliation-export --statement-id bs_abc123 -o recon.csv
+```
 
 ---
 

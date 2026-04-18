@@ -1,32 +1,11 @@
-import argparse
 import json
-import os
-import shutil
-from contextlib import contextmanager
-from pathlib import Path
 
 import pytest
 import requests
 
 import process_receipts
 from recite_client import ReciteClient
-
-
-TEST_TMP_DIR = Path(os.getcwd()) / ".test_tmp"
-
-
-@contextmanager
-def _case_dir(name):
-    TEST_TMP_DIR.mkdir(exist_ok=True)
-    case_dir = TEST_TMP_DIR / name
-    shutil.rmtree(case_dir, ignore_errors=True)
-    case_dir.mkdir()
-    try:
-        yield case_dir
-    finally:
-        shutil.rmtree(case_dir, ignore_errors=True)
-        if TEST_TMP_DIR.exists() and not any(TEST_TMP_DIR.iterdir()):
-            TEST_TMP_DIR.rmdir()
+from tests.conftest import _case_dir
 
 
 class FakeClient:
@@ -127,10 +106,35 @@ def test_encode_file_rejects_unsupported_extensions():
         with pytest.raises(ValueError, match="Unsupported file extension"):
             ReciteClient._encode_file(str(bad_file))
 
-def test_main_outputs_invalid_input_for_bad_import_csv(monkeypatch, capsys):
-    with _case_dir("bad_import_csv") as tmp_path:
-        bad_csv = tmp_path / "bad.csv"
-        # In a real environment, the client handles valid CSV.
-        # But we want to ensure the fallback logic in CLI is right or simply test routing.
-        # However, import_csv only needs a string.
-        pass
+
+def test_parse_kv_list_float_value():
+    result = process_receipts._parse_kv_list(["total=12.34"])
+    assert result == {"total": 12.34}
+
+
+def test_parse_kv_list_negative_int():
+    result = process_receipts._parse_kv_list(["amount=-5"])
+    assert result == {"amount": -5}
+
+
+def test_parse_kv_list_true_boolean():
+    result = process_receipts._parse_kv_list(["enabled=true"])
+    assert result == {"enabled": True}
+
+
+def test_parse_kv_list_false_boolean():
+    result = process_receipts._parse_kv_list(["enabled=false"])
+    assert result == {"enabled": False}
+
+
+def test_parse_kv_list_mixed_types():
+    result = process_receipts._parse_kv_list(
+        ["name=test", "count=42", "rate=3.14", "active=true", "disabled=false"]
+    )
+    assert result == {
+        "name": "test",
+        "count": 42,
+        "rate": 3.14,
+        "active": True,
+        "disabled": False,
+    }

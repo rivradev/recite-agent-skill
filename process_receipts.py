@@ -29,12 +29,18 @@ from recite_client import ReciteClient, ReciteError
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 CONFIG_PATH = os.path.expanduser("~/.config/recite/config.json")
-CSV_NAME    = "bookkeeping_transactions.CSV"
-LTM_FILE    = "long_term_memory.md"
+CSV_NAME = "bookkeeping_transactions.CSV"
+LTM_FILE = "long_term_memory.md"
 
 SUPPORTED_EXTENSIONS = [
-    "*.jpg", "*.jpeg", "*.png", "*.pdf",
-    "*.JPG", "*.JPEG", "*.PNG", "*.PDF",
+    "*.jpg",
+    "*.jpeg",
+    "*.png",
+    "*.pdf",
+    "*.JPG",
+    "*.JPEG",
+    "*.PNG",
+    "*.PDF",
 ]
 
 VALID_EVENTS = [
@@ -53,6 +59,7 @@ VALID_RULE_TYPES = [
 
 # ─── Config / Auth ────────────────────────────────────────────────────────────
 
+
 def get_api_key() -> str | None:
     """Load API key from config file or environment variable."""
     if os.path.exists(CONFIG_PATH):
@@ -70,19 +77,25 @@ def require_api_key() -> str:
     """Return the API key or exit with a clear error message."""
     key = get_api_key()
     if not key:
-        print(json.dumps({
-            "error": "Recite API key not found.",
-            "hint":  (
-                "Set the RECITE_API_KEY environment variable or create "
-                "~/.config/recite/config.json with {\"api_key\": \"re_live_...\"}"
-            ),
-            "docs": "https://recite.rivra.dev/settings/api",
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "error": "Recite API key not found.",
+                    "hint": (
+                        "Set the RECITE_API_KEY environment variable or create "
+                        '~/.config/recite/config.json with {"api_key": "re_live_..."}'
+                    ),
+                    "docs": "https://recite.rivra.dev/settings/api",
+                },
+                indent=2,
+            )
+        )
         sys.exit(1)
     return key
 
 
 # ─── Output Helpers ───────────────────────────────────────────────────────────
+
 
 def output_json(data: object) -> None:
     """Print data as pretty-printed JSON to stdout."""
@@ -120,6 +133,7 @@ def output_error(error: ReciteError) -> None:
 
 
 # ─── CSV Helpers (used by scan-dir) ──────────────────────────────────────────
+
 
 def read_ltm(skill_path: str) -> str:
     """Read and return the contents of long_term_memory.md."""
@@ -238,6 +252,7 @@ def get_receipt_files(target_dir: str) -> list[str]:
 
 # ─── Subcommand: scan-dir ─────────────────────────────────────────────────────
 
+
 def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
     """Scan every receipt in a directory: rename files + append to CSV ledger."""
     skill_path = args.skill_path or "."
@@ -259,8 +274,8 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
         print(f"No receipt files found in '{target_dir}'.")
         return
 
-    csv_path        = os.path.join(target_dir, CSV_NAME)
-    already_done    = get_processed_filenames(csv_path)
+    csv_path = os.path.join(target_dir, CSV_NAME)
+    already_done = get_processed_filenames(csv_path)
     processed = skipped = errors = 0
 
     for file_path in files:
@@ -287,14 +302,14 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
             errors += 1
             continue
 
-        raw      = result.get("data", {})
+        raw = result.get("data", {})
         row_data = flatten_dict(raw.get("extracted_data", {}))
-        row_data["scan_id"]          = raw.get("scan_id")
+        row_data["scan_id"] = raw.get("scan_id")
         row_data["transaction_type"] = raw.get("transaction_type")
 
-        ext      = os.path.splitext(file_path)[1]
-        date     = str(row_data.get("date", "UnknownDate"))
-        vendor   = str(row_data.get("vendor", "UnknownVendor"))
+        ext = os.path.splitext(file_path)[1]
+        date = str(row_data.get("date", "UnknownDate"))
+        vendor = str(row_data.get("vendor", "UnknownVendor"))
         new_name = unique_filename(target_dir, date, vendor, ext)
         new_path = os.path.join(target_dir, new_name)
 
@@ -302,11 +317,13 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
         try:
             os.rename(file_path, new_path)
         except OSError as e:
-            print(f"  Warning: Could not rename '{basename}': {e}. Using original name.")
+            print(
+                f"  Warning: Could not rename '{basename}': {e}. Using original name."
+            )
             actual_name = basename
 
         row_data["OriginalFilename"] = basename
-        row_data["NewFilename"]      = actual_name
+        row_data["NewFilename"] = actual_name
         update_csv(csv_path, row_data)
         print(f"  Done: {actual_name}")
         processed += 1
@@ -324,6 +341,7 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: scan ─────────────────────────────────────────────────────────
 
+
 def cmd_scan(args: argparse.Namespace, client: ReciteClient) -> None:
     """Scan a single receipt file and print the full API response as JSON."""
     result = client.scan_file(
@@ -338,6 +356,7 @@ def cmd_scan(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: scan-url ─────────────────────────────────────────────────────
 
+
 def cmd_scan_url(args: argparse.Namespace, client: ReciteClient) -> None:
     """Scan a receipt image URL and print the full API response as JSON."""
     result = client.scan_url(
@@ -351,6 +370,7 @@ def cmd_scan_url(args: argparse.Namespace, client: ReciteClient) -> None:
 
 
 # ─── Subcommand: scan-text ────────────────────────────────────────────────────
+
 
 def cmd_scan_text(args: argparse.Namespace, client: ReciteClient) -> None:
     """Scan raw receipt text (read from a file or stdin) and return extracted data."""
@@ -371,6 +391,7 @@ def cmd_scan_text(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: get-scan ─────────────────────────────────────────────────────
 
+
 def cmd_get_scan(args: argparse.Namespace, client: ReciteClient) -> None:
     """Retrieve a previously submitted scan by its ID."""
     output_json(client.get_scan(args.scan_id))
@@ -378,15 +399,22 @@ def cmd_get_scan(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: batch ────────────────────────────────────────────────────────
 
+
 def cmd_batch(args: argparse.Namespace, client: ReciteClient) -> None:
     """Submit up to 20 files or URLs for asynchronous batch scanning."""
     if len(args.files) > 20:
-        print(f"  Warning: Only the first 20 of {len(args.files)} items will be submitted.", file=sys.stderr)
-    result = client.create_batch(args.files, project_id=getattr(args, "project_id", None))
+        print(
+            f"  Warning: Only the first 20 of {len(args.files)} items will be submitted.",
+            file=sys.stderr,
+        )
+    result = client.create_batch(
+        args.files, project_id=getattr(args, "project_id", None)
+    )
     output_json(result)
 
 
 # ─── Subcommand: batch-status ─────────────────────────────────────────────────
+
 
 def cmd_batch_status(args: argparse.Namespace, client: ReciteClient) -> None:
     """Check the status of an asynchronous batch job."""
@@ -395,12 +423,14 @@ def cmd_batch_status(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: batch-results ────────────────────────────────────────────────
 
+
 def cmd_batch_results(args: argparse.Namespace, client: ReciteClient) -> None:
     """Retrieve all extraction results for a completed batch job."""
     output_json(client.get_batch_results(args.batch_id))
 
 
 # ─── Subcommand: batch-wait ───────────────────────────────────────────────────
+
 
 def cmd_batch_wait(args: argparse.Namespace, client: ReciteClient) -> None:
     """Poll a batch job until it completes, then print results.
@@ -409,7 +439,10 @@ def cmd_batch_wait(args: argparse.Namespace, client: ReciteClient) -> None:
     """
     interval = max(2, args.interval)
     deadline = time.time() + args.timeout
-    print(f"  Waiting for batch {args.batch_id} (timeout {args.timeout}s) ...", file=sys.stderr)
+    print(
+        f"  Waiting for batch {args.batch_id} (timeout {args.timeout}s) ...",
+        file=sys.stderr,
+    )
 
     while time.time() < deadline:
         status_resp = client.get_batch_status(args.batch_id)
@@ -429,18 +462,21 @@ def cmd_batch_wait(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: transactions ─────────────────────────────────────────────────
 
+
 def cmd_transactions(args: argparse.Namespace, client: ReciteClient) -> None:
     """List transactions with optional filters."""
-    output_json(client.list_transactions(
-        start_date=args.start_date,
-        end_date=args.end_date,
-        category=args.category,
-        vendor=args.vendor,
-        project_id=args.project_id,
-        limit=args.limit,
-        offset=args.offset,
-        sort=args.sort,
-    ))
+    output_json(
+        client.list_transactions(
+            start_date=args.start_date,
+            end_date=args.end_date,
+            category=args.category,
+            vendor=args.vendor,
+            project_id=args.project_id,
+            limit=args.limit,
+            offset=args.offset,
+            sort=args.sort,
+        )
+    )
 
 
 def cmd_transaction_get(args: argparse.Namespace, client: ReciteClient) -> None:
@@ -454,17 +490,21 @@ def cmd_transaction_create(args: argparse.Namespace, client: ReciteClient) -> No
     try:
         total = float(args.total)
     except ValueError as exc:
-        raise ValueError(f"Invalid total '{args.total}'. Expected a numeric amount.") from exc
-    output_json(client.create_transaction(
-        vendor=args.vendor,
-        total=total,
-        date=args.date,
-        currency=args.currency or "USD",
-        category=args.category,
-        project_id=args.project_id,
-        notes=args.notes,
-        **extra,
-    ))
+        raise ValueError(
+            f"Invalid total '{args.total}'. Expected a numeric amount."
+        ) from exc
+    output_json(
+        client.create_transaction(
+            vendor=args.vendor,
+            total=total,
+            date=args.date,
+            currency=args.currency or "USD",
+            category=args.category,
+            project_id=args.project_id,
+            notes=args.notes,
+            **extra,
+        )
+    )
 
 
 def cmd_transaction_update(args: argparse.Namespace, client: ReciteClient) -> None:
@@ -480,6 +520,7 @@ def cmd_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> No
 
 # ─── Subcommand: import ───────────────────────────────────────────────────────
 
+
 def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
     """Bulk-import up to 500 transactions from a JSON or CSV file.
 
@@ -487,7 +528,9 @@ def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
     with a "transactions" key containing the list.
     For CSV, pass --format csv or use a file with a .csv extension.
     """
-    is_csv = getattr(args, "format", None) == "csv" or args.file.lower().endswith(".csv")
+    is_csv = getattr(args, "format", None) == "csv" or args.file.lower().endswith(
+        ".csv"
+    )
 
     if is_csv:
         with open(args.file, encoding="utf-8") as f:
@@ -508,17 +551,21 @@ def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: summary ──────────────────────────────────────────────────────
 
+
 def cmd_summary(args: argparse.Namespace, client: ReciteClient) -> None:
     """Get aggregate financial statistics."""
-    output_json(client.get_summary(
-        start_date=args.start_date,
-        end_date=args.end_date,
-        group_by=args.group_by,
-        project_id=args.project_id,
-    ))
+    output_json(
+        client.get_summary(
+            start_date=args.start_date,
+            end_date=args.end_date,
+            group_by=args.group_by,
+            project_id=args.project_id,
+        )
+    )
 
 
 # ─── Subcommand: projects ─────────────────────────────────────────────────────
+
 
 def cmd_projects(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.list_projects())
@@ -538,16 +585,19 @@ def cmd_project_delete(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: categories ───────────────────────────────────────────────────
 
+
 def cmd_categories(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.list_categories())
 
 
 def cmd_category_add(args: argparse.Namespace, client: ReciteClient) -> None:
-    output_json(client.create_category(
-        args.name,
-        description=args.description,
-        color=args.color,
-    ))
+    output_json(
+        client.create_category(
+            args.name,
+            description=args.description,
+            color=args.color,
+        )
+    )
 
 
 def cmd_category_delete(args: argparse.Namespace, client: ReciteClient) -> None:
@@ -555,6 +605,7 @@ def cmd_category_delete(args: argparse.Namespace, client: ReciteClient) -> None:
 
 
 # ─── Subcommand: vendors ──────────────────────────────────────────────────────
+
 
 def cmd_vendors(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.list_vendors())
@@ -570,6 +621,7 @@ def cmd_vendor_delete(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: rules ────────────────────────────────────────────────────────
 
+
 def cmd_rules(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.list_rules())
 
@@ -577,17 +629,19 @@ def cmd_rules(args: argparse.Namespace, client: ReciteClient) -> None:
 def cmd_rule_create(args: argparse.Namespace, client: ReciteClient) -> None:
     try:
         condition = json.loads(args.condition)
-        action    = json.loads(args.action)
+        action = json.loads(args.action)
     except json.JSONDecodeError as e:
         print(json.dumps({"error": f"Invalid JSON in --condition or --action: {e}"}))
         sys.exit(1)
-    output_json(client.create_rule(
-        rule_type=args.type,
-        condition=condition,
-        action=action,
-        priority=args.priority,
-        enabled=not args.disabled,
-    ))
+    output_json(
+        client.create_rule(
+            rule_type=args.type,
+            condition=condition,
+            action=action,
+            priority=args.priority,
+            enabled=not args.disabled,
+        )
+    )
 
 
 def cmd_rule_update(args: argparse.Namespace, client: ReciteClient) -> None:
@@ -600,6 +654,7 @@ def cmd_rule_delete(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: webhooks ─────────────────────────────────────────────────────
 
+
 def cmd_webhooks(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.list_webhooks())
 
@@ -607,7 +662,9 @@ def cmd_webhooks(args: argparse.Namespace, client: ReciteClient) -> None:
 def cmd_webhook_create(args: argparse.Namespace, client: ReciteClient) -> None:
     invalid = [e for e in args.events if e not in VALID_EVENTS]
     if invalid:
-        print(json.dumps({"error": f"Unknown event(s): {invalid}. Valid: {VALID_EVENTS}"}))
+        print(
+            json.dumps({"error": f"Unknown event(s): {invalid}. Valid: {VALID_EVENTS}"})
+        )
         sys.exit(1)
     output_json(client.create_webhook(args.url, args.events, secret=args.secret))
 
@@ -617,6 +674,7 @@ def cmd_webhook_delete(args: argparse.Namespace, client: ReciteClient) -> None:
 
 
 # ─── Subcommand: export ───────────────────────────────────────────────────────
+
 
 def cmd_export(args: argparse.Namespace, client: ReciteClient) -> None:
     """Export transactions. If --output is given, write content to a local file."""
@@ -642,12 +700,144 @@ def cmd_export(args: argparse.Namespace, client: ReciteClient) -> None:
 
 # ─── Subcommand: usage ────────────────────────────────────────────────────────
 
+
 def cmd_usage(args: argparse.Namespace, client: ReciteClient) -> None:
     """View API scan quota and request metrics."""
     output_json(client.get_usage())
 
 
+# ─── Subcommand: bank-statements ──────────────────────────────────────────────
+
+
+def cmd_bank_statements(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(
+        client.list_bank_statements(
+            limit=args.limit,
+            offset=args.offset,
+        )
+    )
+
+
+def cmd_bank_statement_upload(args: argparse.Namespace, client: ReciteClient) -> None:
+    with open(args.file, encoding="utf-8") as f:
+        csv_data = f.read()
+    output_json(client.upload_bank_statement(csv_data))
+
+
+def cmd_bank_statement_get(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(client.get_bank_statement(args.id))
+
+
+def cmd_bank_statement_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(client.delete_bank_statement(args.id))
+
+
+def cmd_bank_statement_export(args: argparse.Namespace, client: ReciteClient) -> None:
+    result = client.export_bank_statement(args.id)
+    if args.output:
+        content = (result.get("data") or {}).get("content", "")
+        if content:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(json.dumps({"exported_to": args.output, "bytes": len(content)}))
+        else:
+            output_json(result)
+    else:
+        output_json(result)
+
+
+# ─── Subcommand: bank-transactions ────────────────────────────────────────────
+
+
+def cmd_bank_transactions(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(
+        client.list_bank_transactions(
+            statement_id=getattr(args, "statement_id", None),
+            limit=args.limit,
+            offset=args.offset,
+        )
+    )
+
+
+def cmd_bank_transaction_get(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(client.get_bank_transaction(args.id))
+
+
+def cmd_bank_transaction_update(args: argparse.Namespace, client: ReciteClient) -> None:
+    fields = _parse_kv_list(args.fields)
+    output_json(client.update_bank_transaction(args.id, **fields))
+
+
+def cmd_bank_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(client.delete_bank_transaction(args.id))
+
+
+# ─── Subcommand: reconciliation ───────────────────────────────────────────────
+
+
+def cmd_reconciliation_links(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(
+        client.list_reconciliation_links(
+            statement_id=getattr(args, "statement_id", None),
+            limit=args.limit,
+            offset=args.offset,
+        )
+    )
+
+
+def cmd_reconciliation_link_create(
+    args: argparse.Namespace, client: ReciteClient
+) -> None:
+    output_json(
+        client.create_reconciliation_link(
+            args.transaction_id,
+            args.bank_transaction_id,
+        )
+    )
+
+
+def cmd_reconciliation_link_update(
+    args: argparse.Namespace, client: ReciteClient
+) -> None:
+    fields = _parse_kv_list(args.fields)
+    output_json(client.update_reconciliation_link(args.id, **fields))
+
+
+def cmd_reconciliation_link_delete(
+    args: argparse.Namespace, client: ReciteClient
+) -> None:
+    output_json(client.delete_reconciliation_link(args.id))
+
+
+def cmd_reconciliation_auto_match(
+    args: argparse.Namespace, client: ReciteClient
+) -> None:
+    output_json(client.auto_match_reconciliation(args.statement_id))
+
+
+def cmd_reconciliation_summary(args: argparse.Namespace, client: ReciteClient) -> None:
+    output_json(client.get_reconciliation_summary(args.statement_id))
+
+
+def cmd_reconciliation_export(args: argparse.Namespace, client: ReciteClient) -> None:
+    result = client.export_reconciliation(
+        statement_id=getattr(args, "statement_id", None),
+        format=getattr(args, "format", None),
+    )
+    if args.output:
+        content = (result.get("data") or {}).get("content", "")
+        if content:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(json.dumps({"exported_to": args.output, "bytes": len(content)}))
+        else:
+            output_json(result)
+    else:
+        output_json(result)
+
+
 # ─── Utility ──────────────────────────────────────────────────────────────────
+
 
 def _parse_kv_list(pairs: list[str]) -> dict:
     """Convert ['key=value', ...] into {'key': 'value', ...}."""
@@ -670,6 +860,7 @@ def _parse_kv_list(pairs: list[str]) -> dict:
 
 # ─── Argument Parser ──────────────────────────────────────────────────────────
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="process_receipts.py",
@@ -688,210 +879,393 @@ def build_parser() -> argparse.ArgumentParser:
         help="Scan a directory of receipts → rename files + append to CSV ledger",
         description="Original bookkeeping workflow: scan all images/PDFs in a folder.",
     )
-    p.add_argument("directory",   help="Folder containing receipt images or PDFs")
-    p.add_argument("skill_path",  nargs="?", default=".",
-                   help="Skill folder path (used to locate long_term_memory.md)")
-    p.add_argument("--project-id", dest="project_id",
-                   help="Assign all scans to this Recite project ID")
+    p.add_argument("directory", help="Folder containing receipt images or PDFs")
+    p.add_argument(
+        "skill_path",
+        nargs="?",
+        default=".",
+        help="Skill folder path (used to locate long_term_memory.md)",
+    )
+    p.add_argument(
+        "--project-id",
+        dest="project_id",
+        help="Assign all scans to this Recite project ID",
+    )
     p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
-    p.add_argument("--auto-create-transaction", action="store_true", default=None,
-                   help="Auto-create a transaction if confidence meets threshold")
-    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
+    p.add_argument(
+        "--auto-create-transaction",
+        action="store_true",
+        default=None,
+        help="Auto-create a transaction if confidence meets threshold",
+    )
+    p.add_argument(
+        "--confidence-threshold", type=float, help="The confidence threshold"
+    )
 
     # ── scan ──────────────────────────────────────────────────────────────────
     p = sub.add_parser("scan", help="Scan a single receipt file → JSON")
-    p.add_argument("file",        help="Path to image (.jpg/.png) or PDF")
-    p.add_argument("--project-id", dest="project_id",
-                   help="Assign scan to this project")
+    p.add_argument("file", help="Path to image (.jpg/.png) or PDF")
+    p.add_argument(
+        "--project-id", dest="project_id", help="Assign scan to this project"
+    )
     p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
-    p.add_argument("--auto-create-transaction", action="store_true", default=None,
-                   help="Auto-create a transaction if confidence meets threshold")
-    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
+    p.add_argument(
+        "--auto-create-transaction",
+        action="store_true",
+        default=None,
+        help="Auto-create a transaction if confidence meets threshold",
+    )
+    p.add_argument(
+        "--confidence-threshold", type=float, help="The confidence threshold"
+    )
 
     # ── scan-url ──────────────────────────────────────────────────────────────
     p = sub.add_parser("scan-url", help="Scan a receipt image URL → JSON")
-    p.add_argument("url",         help="URL of the image or PDF")
-    p.add_argument("--project-id", dest="project_id",
-                   help="Assign scan to this project")
+    p.add_argument("url", help="URL of the image or PDF")
+    p.add_argument(
+        "--project-id", dest="project_id", help="Assign scan to this project"
+    )
     p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
-    p.add_argument("--auto-create-transaction", action="store_true", default=None,
-                   help="Auto-create a transaction if confidence meets threshold")
-    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
+    p.add_argument(
+        "--auto-create-transaction",
+        action="store_true",
+        default=None,
+        help="Auto-create a transaction if confidence meets threshold",
+    )
+    p.add_argument(
+        "--confidence-threshold", type=float, help="The confidence threshold"
+    )
 
     # ── scan-text ─────────────────────────────────────────────────────────────
-    p = sub.add_parser("scan-text",
-                       help="Scan raw receipt text from a file (or stdin with '-') → JSON")
-    p.add_argument("file",        help="Text file path, or '-' to read from stdin")
+    p = sub.add_parser(
+        "scan-text", help="Scan raw receipt text from a file (or stdin with '-') → JSON"
+    )
+    p.add_argument("file", help="Text file path, or '-' to read from stdin")
     p.add_argument("--project-id", dest="project_id")
     p.add_argument("--format", help="Response format hint ('json', 'csv', 'text')")
-    p.add_argument("--auto-create-transaction", action="store_true", default=None,
-                   help="Auto-create a transaction if confidence meets threshold")
-    p.add_argument("--confidence-threshold", type=float, help="The confidence threshold")
+    p.add_argument(
+        "--auto-create-transaction",
+        action="store_true",
+        default=None,
+        help="Auto-create a transaction if confidence meets threshold",
+    )
+    p.add_argument(
+        "--confidence-threshold", type=float, help="The confidence threshold"
+    )
 
     # ── get-scan ──────────────────────────────────────────────────────────────
     p = sub.add_parser("get-scan", help="Retrieve a previous scan by ID → JSON")
-    p.add_argument("scan_id",     help="Scan ID returned by the /scan endpoint")
+    p.add_argument("scan_id", help="Scan ID returned by the /scan endpoint")
 
     # ── batch ─────────────────────────────────────────────────────────────────
-    p = sub.add_parser("batch",
-                       help="Submit up to 20 receipt files or URLs for async batch scanning → JSON")
-    p.add_argument("files",       nargs="+", help="File paths or URLs to scan (max 20)")
+    p = sub.add_parser(
+        "batch",
+        help="Submit up to 20 receipt files or URLs for async batch scanning → JSON",
+    )
+    p.add_argument("files", nargs="+", help="File paths or URLs to scan (max 20)")
     p.add_argument("--project-id", dest="project_id")
 
     # ── batch-status ──────────────────────────────────────────────────────────
     p = sub.add_parser("batch-status", help="Check batch job status → JSON")
-    p.add_argument("batch_id",    help="Batch ID from the batch submission response")
+    p.add_argument("batch_id", help="Batch ID from the batch submission response")
 
     # ── batch-results ─────────────────────────────────────────────────────────
-    p = sub.add_parser("batch-results", help="Retrieve all results for a completed batch → JSON")
-    p.add_argument("batch_id",    help="Batch ID")
+    p = sub.add_parser(
+        "batch-results", help="Retrieve all results for a completed batch → JSON"
+    )
+    p.add_argument("batch_id", help="Batch ID")
 
     # ── batch-wait ────────────────────────────────────────────────────────────
-    p = sub.add_parser("batch-wait",
-                       help="Poll a batch job until complete, then print results → JSON")
-    p.add_argument("batch_id",    help="Batch ID")
-    p.add_argument("--timeout",   type=int, default=300, help="Max wait in seconds (default 300)")
-    p.add_argument("--interval",  type=int, default=5,   help="Poll interval in seconds (default 5)")
+    p = sub.add_parser(
+        "batch-wait", help="Poll a batch job until complete, then print results → JSON"
+    )
+    p.add_argument("batch_id", help="Batch ID")
+    p.add_argument(
+        "--timeout", type=int, default=300, help="Max wait in seconds (default 300)"
+    )
+    p.add_argument(
+        "--interval", type=int, default=5, help="Poll interval in seconds (default 5)"
+    )
 
     # ── transactions ──────────────────────────────────────────────────────────
-    p = sub.add_parser("transactions", help="List transactions with optional filters → JSON")
-    p.add_argument("--start-date",  dest="start_date", metavar="YYYY-MM-DD")
-    p.add_argument("--end-date",    dest="end_date",   metavar="YYYY-MM-DD")
-    p.add_argument("--category",    help="Filter by category name")
-    p.add_argument("--vendor",      help="Filter by vendor name")
-    p.add_argument("--project-id",  dest="project_id")
-    p.add_argument("--limit",       type=int, help="Max records to return")
-    p.add_argument("--offset",      type=int, help="Records to skip (pagination)")
-    p.add_argument("--sort",        help="Sort field, e.g. '-date', 'total'")
+    p = sub.add_parser(
+        "transactions", help="List transactions with optional filters → JSON"
+    )
+    p.add_argument("--start-date", dest="start_date", metavar="YYYY-MM-DD")
+    p.add_argument("--end-date", dest="end_date", metavar="YYYY-MM-DD")
+    p.add_argument("--category", help="Filter by category name")
+    p.add_argument("--vendor", help="Filter by vendor name")
+    p.add_argument("--project-id", dest="project_id")
+    p.add_argument("--limit", type=int, help="Max records to return")
+    p.add_argument("--offset", type=int, help="Records to skip (pagination)")
+    p.add_argument("--sort", help="Sort field, e.g. '-date', 'total'")
 
     # ── transaction-get ───────────────────────────────────────────────────────
     p = sub.add_parser("transaction-get", help="Get a single transaction by ID → JSON")
-    p.add_argument("id",           help="Transaction ID")
+    p.add_argument("id", help="Transaction ID")
 
     # ── transaction-create ────────────────────────────────────────────────────
-    p = sub.add_parser("transaction-create",
-                       help="Manually create a transaction → JSON")
-    p.add_argument("--vendor",      required=True,  help="Vendor/merchant name")
-    p.add_argument("--total",       required=True,  help="Amount (negative = refund)")
-    p.add_argument("--date",        required=True,  metavar="YYYY-MM-DD")
-    p.add_argument("--currency",    default="USD",  help="ISO 4217 code (default USD)")
-    p.add_argument("--category",    help="Expense category")
-    p.add_argument("--project-id",  dest="project_id")
-    p.add_argument("--notes",       help="Free-form notes")
-    p.add_argument("extra",         nargs="*",
-                   help="Additional API fields as key=value pairs")
+    p = sub.add_parser(
+        "transaction-create", help="Manually create a transaction → JSON"
+    )
+    p.add_argument("--vendor", required=True, help="Vendor/merchant name")
+    p.add_argument("--total", required=True, help="Amount (negative = refund)")
+    p.add_argument("--date", required=True, metavar="YYYY-MM-DD")
+    p.add_argument("--currency", default="USD", help="ISO 4217 code (default USD)")
+    p.add_argument("--category", help="Expense category")
+    p.add_argument("--project-id", dest="project_id")
+    p.add_argument("--notes", help="Free-form notes")
+    p.add_argument("extra", nargs="*", help="Additional API fields as key=value pairs")
 
     # ── transaction-update ────────────────────────────────────────────────────
-    p = sub.add_parser("transaction-update",
-                       help="Update fields of a transaction → JSON")
-    p.add_argument("id",           help="Transaction ID")
-    p.add_argument("fields",       nargs="+",
-                   help="Fields to update as key=value pairs  e.g. category=Travel notes=OK")
+    p = sub.add_parser(
+        "transaction-update", help="Update fields of a transaction → JSON"
+    )
+    p.add_argument("id", help="Transaction ID")
+    p.add_argument(
+        "fields",
+        nargs="+",
+        help="Fields to update as key=value pairs  e.g. category=Travel notes=OK",
+    )
 
     # ── transaction-delete ────────────────────────────────────────────────────
-    p = sub.add_parser("transaction-delete",
-                       help="Permanently delete a transaction → JSON")
-    p.add_argument("id",           help="Transaction ID")
+    p = sub.add_parser(
+        "transaction-delete", help="Permanently delete a transaction → JSON"
+    )
+    p.add_argument("id", help="Transaction ID")
 
     # ── import ────────────────────────────────────────────────────────────────
-    p = sub.add_parser("import",
-                       help="Bulk-import up to 500 transactions from a JSON or CSV file → JSON")
-    p.add_argument("file",         help="JSON or CSV file. For JSON: a list [] or {\"transactions\": [...]}")
-    p.add_argument("--format",     choices=["json", "csv"], help="Format of the file ('json', 'csv')")
+    p = sub.add_parser(
+        "import",
+        help="Bulk-import up to 500 transactions from a JSON or CSV file → JSON",
+    )
+    p.add_argument(
+        "file", help='JSON or CSV file. For JSON: a list [] or {"transactions": [...]}'
+    )
+    p.add_argument(
+        "--format", choices=["json", "csv"], help="Format of the file ('json', 'csv')"
+    )
 
     # ── summary ───────────────────────────────────────────────────────────────
     p = sub.add_parser("summary", help="Get aggregate financial statistics → JSON")
-    p.add_argument("--start-date",  dest="start_date", metavar="YYYY-MM-DD")
-    p.add_argument("--end-date",    dest="end_date",   metavar="YYYY-MM-DD")
-    p.add_argument("--group-by",    dest="group_by",
-                   help="Grouping dimension: category | vendor | month | project")
-    p.add_argument("--project-id",  dest="project_id")
+    p.add_argument("--start-date", dest="start_date", metavar="YYYY-MM-DD")
+    p.add_argument("--end-date", dest="end_date", metavar="YYYY-MM-DD")
+    p.add_argument(
+        "--group-by",
+        dest="group_by",
+        help="Grouping dimension: category | vendor | month | project",
+    )
+    p.add_argument("--project-id", dest="project_id")
 
     # ── projects ──────────────────────────────────────────────────────────────
     sub.add_parser("projects", help="List all projects → JSON")
 
     p = sub.add_parser("project-create", help="Create a new project → JSON")
-    p.add_argument("name",         help="Project name")
+    p.add_argument("name", help="Project name")
     p.add_argument("--description")
 
     p = sub.add_parser("project-update", help="Update a project → JSON")
-    p.add_argument("id",           help="Project ID")
-    p.add_argument("fields",       nargs="+", help="Fields as key=value pairs")
+    p.add_argument("id", help="Project ID")
+    p.add_argument("fields", nargs="+", help="Fields as key=value pairs")
 
     p = sub.add_parser("project-delete", help="Delete a project → JSON")
-    p.add_argument("id",           help="Project ID")
+    p.add_argument("id", help="Project ID")
 
     # ── categories ────────────────────────────────────────────────────────────
     sub.add_parser("categories", help="List all categories (built-in + custom) → JSON")
 
     p = sub.add_parser("category-add", help="Add a custom expense category → JSON")
-    p.add_argument("name",         help="Unique category name")
+    p.add_argument("name", help="Unique category name")
     p.add_argument("--description")
-    p.add_argument("--color",      help="Hex color e.g. '#FF5733'")
+    p.add_argument("--color", help="Hex color e.g. '#FF5733'")
 
     p = sub.add_parser("category-delete", help="Remove a custom category → JSON")
-    p.add_argument("name",         help="Category name to remove")
+    p.add_argument("name", help="Category name to remove")
 
     # ── vendors ───────────────────────────────────────────────────────────────
     sub.add_parser("vendors", help="List custom vendors → JSON")
 
-    p = sub.add_parser("vendor-add",
-                       help="Register a vendor for auto-categorization → JSON")
-    p.add_argument("name",         help="Vendor name as it appears on receipts")
-    p.add_argument("--category",   help="Default expense category for this vendor")
+    p = sub.add_parser(
+        "vendor-add", help="Register a vendor for auto-categorization → JSON"
+    )
+    p.add_argument("name", help="Vendor name as it appears on receipts")
+    p.add_argument("--category", help="Default expense category for this vendor")
 
     p = sub.add_parser("vendor-delete", help="Remove a vendor → JSON")
-    p.add_argument("name",         help="Vendor name to remove")
+    p.add_argument("name", help="Vendor name to remove")
 
     # ── rules ─────────────────────────────────────────────────────────────────
     sub.add_parser("rules", help="List all automation rules → JSON")
 
     p = sub.add_parser("rule-create", help="Create an automation rule → JSON")
-    p.add_argument("--type",       required=True, choices=VALID_RULE_TYPES,
-                   dest="type",    help="Rule type")
-    p.add_argument("--condition",  required=True,
-                   help='JSON condition object, e.g. \'{"vendor_contains":"Amazon"}\'')
-    p.add_argument("--action",     required=True,
-                   help='JSON action object, e.g. \'{"set_category":"Software"}\'')
-    p.add_argument("--priority",   type=int, help="Evaluation order (higher = first)")
-    p.add_argument("--disabled",   action="store_true", help="Create the rule as disabled")
+    p.add_argument(
+        "--type", required=True, choices=VALID_RULE_TYPES, dest="type", help="Rule type"
+    )
+    p.add_argument(
+        "--condition",
+        required=True,
+        help='JSON condition object, e.g. \'{"vendor_contains":"Amazon"}\'',
+    )
+    p.add_argument(
+        "--action",
+        required=True,
+        help='JSON action object, e.g. \'{"set_category":"Software"}\'',
+    )
+    p.add_argument("--priority", type=int, help="Evaluation order (higher = first)")
+    p.add_argument(
+        "--disabled", action="store_true", help="Create the rule as disabled"
+    )
 
     p = sub.add_parser("rule-update", help="Update an automation rule → JSON")
-    p.add_argument("id",           help="Rule ID")
-    p.add_argument("fields",       nargs="+",
-                   help="Fields as key=value pairs  e.g. enabled=false priority=10")
+    p.add_argument("id", help="Rule ID")
+    p.add_argument(
+        "fields",
+        nargs="+",
+        help="Fields as key=value pairs  e.g. enabled=false priority=10",
+    )
 
     p = sub.add_parser("rule-delete", help="Remove an automation rule → JSON")
-    p.add_argument("id",           help="Rule ID")
+    p.add_argument("id", help="Rule ID")
 
     # ── webhooks ──────────────────────────────────────────────────────────────
     sub.add_parser("webhooks", help="List all registered webhooks → JSON")
 
     p = sub.add_parser("webhook-create", help="Register a webhook endpoint → JSON")
-    p.add_argument("url",          help="HTTPS endpoint URL")
-    p.add_argument("events",       nargs="+",
-                   help=(
-                       "Events to subscribe to. Valid values: "
-                       + ", ".join(VALID_EVENTS)
-                   ))
-    p.add_argument("--secret",     help="HMAC-SHA256 signing secret (recommended)")
+    p.add_argument("url", help="HTTPS endpoint URL")
+    p.add_argument(
+        "events",
+        nargs="+",
+        help=("Events to subscribe to. Valid values: " + ", ".join(VALID_EVENTS)),
+    )
+    p.add_argument("--secret", help="HMAC-SHA256 signing secret (recommended)")
 
     p = sub.add_parser("webhook-delete", help="Unregister a webhook → JSON")
-    p.add_argument("id",           help="Webhook ID")
+    p.add_argument("id", help="Webhook ID")
 
     # ── export ────────────────────────────────────────────────────────────────
-    p = sub.add_parser("export",
-                       help="Export transactions as CSV or JSON → JSON (or file with -o)")
-    p.add_argument("--format",      choices=["csv", "json"], default="csv")
-    p.add_argument("--start-date",  dest="start_date", metavar="YYYY-MM-DD")
-    p.add_argument("--end-date",    dest="end_date",   metavar="YYYY-MM-DD")
-    p.add_argument("--project-id",  dest="project_id")
+    p = sub.add_parser(
+        "export", help="Export transactions as CSV or JSON → JSON (or file with -o)"
+    )
+    p.add_argument("--format", choices=["csv", "json"], default="csv")
+    p.add_argument("--start-date", dest="start_date", metavar="YYYY-MM-DD")
+    p.add_argument("--end-date", dest="end_date", metavar="YYYY-MM-DD")
+    p.add_argument("--project-id", dest="project_id")
     p.add_argument("--category")
-    p.add_argument("--output", "-o",
-                   help="Write inline export content to this local file path")
+    p.add_argument(
+        "--output", "-o", help="Write inline export content to this local file path"
+    )
 
     # ── usage ─────────────────────────────────────────────────────────────────
     sub.add_parser("usage", help="View API quota and request metrics → JSON")
+
+    # ── bank-statements ───────────────────────────────────────────────────────
+    p = sub.add_parser("bank-statements", help="List bank statements → JSON")
+    p.add_argument("--limit", type=int, help="Max records to return")
+    p.add_argument("--offset", type=int, help="Records to skip (pagination)")
+
+    p = sub.add_parser(
+        "bank-statement-upload", help="Upload a bank statement CSV → JSON"
+    )
+    p.add_argument("file", help="Path to CSV file")
+
+    p = sub.add_parser("bank-statement-get", help="Get a bank statement by ID → JSON")
+    p.add_argument("id", help="Bank statement ID")
+
+    p = sub.add_parser("bank-statement-delete", help="Delete a bank statement → JSON")
+    p.add_argument("id", help="Bank statement ID")
+
+    p = sub.add_parser(
+        "bank-statement-export",
+        help="Export a bank statement as CSV → JSON (or file with -o)",
+    )
+    p.add_argument("id", help="Bank statement ID")
+    p.add_argument(
+        "--output", "-o", help="Write inline export content to this local file path"
+    )
+
+    # ── bank-transactions ─────────────────────────────────────────────────────
+    p = sub.add_parser("bank-transactions", help="List bank transactions → JSON")
+    p.add_argument(
+        "--statement-id", dest="statement_id", help="Filter by bank statement ID"
+    )
+    p.add_argument("--limit", type=int, help="Max records to return")
+    p.add_argument("--offset", type=int, help="Records to skip (pagination)")
+
+    p = sub.add_parser(
+        "bank-transaction-get", help="Get a bank transaction by ID → JSON"
+    )
+    p.add_argument("id", help="Bank transaction ID")
+
+    p = sub.add_parser(
+        "bank-transaction-update", help="Update fields of a bank transaction → JSON"
+    )
+    p.add_argument("id", help="Bank transaction ID")
+    p.add_argument("fields", nargs="+", help="Fields to update as key=value pairs")
+
+    p = sub.add_parser(
+        "bank-transaction-delete", help="Delete a bank transaction → JSON"
+    )
+    p.add_argument("id", help="Bank transaction ID")
+
+    # ── reconciliation ────────────────────────────────────────────────────────
+    p = sub.add_parser("reconciliation-links", help="List reconciliation links → JSON")
+    p.add_argument(
+        "--statement-id", dest="statement_id", help="Filter by bank statement ID"
+    )
+    p.add_argument("--limit", type=int, help="Max records to return")
+    p.add_argument("--offset", type=int, help="Records to skip (pagination)")
+
+    p = sub.add_parser(
+        "reconciliation-link-create",
+        help="Link a transaction to a bank transaction → JSON",
+    )
+    p.add_argument(
+        "--transaction-id",
+        required=True,
+        dest="transaction_id",
+        help="Receipt transaction ID",
+    )
+    p.add_argument(
+        "--bank-transaction-id",
+        required=True,
+        dest="bank_transaction_id",
+        help="Bank transaction ID",
+    )
+
+    p = sub.add_parser(
+        "reconciliation-link-update", help="Update a reconciliation link → JSON"
+    )
+    p.add_argument("id", help="Reconciliation link ID")
+    p.add_argument("fields", nargs="+", help="Fields to update as key=value pairs")
+
+    p = sub.add_parser(
+        "reconciliation-link-delete", help="Delete a reconciliation link → JSON"
+    )
+    p.add_argument("id", help="Reconciliation link ID")
+
+    p = sub.add_parser(
+        "reconciliation-auto-match",
+        help="Auto-match bank transactions to receipt transactions → JSON",
+    )
+    p.add_argument("statement_id", help="Bank statement ID")
+
+    p = sub.add_parser(
+        "reconciliation-summary",
+        help="Get reconciliation summary for a statement → JSON",
+    )
+    p.add_argument("statement_id", help="Bank statement ID")
+
+    p = sub.add_parser(
+        "reconciliation-export",
+        help="Export reconciliation data → JSON (or file with -o)",
+    )
+    p.add_argument(
+        "--statement-id", dest="statement_id", help="Filter by bank statement ID"
+    )
+    p.add_argument("--format", help="Export format (e.g. csv, json)")
+    p.add_argument(
+        "--output", "-o", help="Write inline export content to this local file path"
+    )
 
     return parser
 
@@ -899,45 +1273,62 @@ def build_parser() -> argparse.ArgumentParser:
 # ─── Dispatch Table ───────────────────────────────────────────────────────────
 
 COMMAND_MAP = {
-    "scan-dir":            cmd_scan_dir,
-    "scan":                cmd_scan,
-    "scan-url":            cmd_scan_url,
-    "scan-text":           cmd_scan_text,
-    "get-scan":            cmd_get_scan,
-    "batch":               cmd_batch,
-    "batch-status":        cmd_batch_status,
-    "batch-results":       cmd_batch_results,
-    "batch-wait":          cmd_batch_wait,
-    "transactions":        cmd_transactions,
-    "transaction-get":     cmd_transaction_get,
-    "transaction-create":  cmd_transaction_create,
-    "transaction-update":  cmd_transaction_update,
-    "transaction-delete":  cmd_transaction_delete,
-    "import":              cmd_import,
-    "summary":             cmd_summary,
-    "projects":            cmd_projects,
-    "project-create":      cmd_project_create,
-    "project-update":      cmd_project_update,
-    "project-delete":      cmd_project_delete,
-    "categories":          cmd_categories,
-    "category-add":        cmd_category_add,
-    "category-delete":     cmd_category_delete,
-    "vendors":             cmd_vendors,
-    "vendor-add":          cmd_vendor_add,
-    "vendor-delete":       cmd_vendor_delete,
-    "rules":               cmd_rules,
-    "rule-create":         cmd_rule_create,
-    "rule-update":         cmd_rule_update,
-    "rule-delete":         cmd_rule_delete,
-    "webhooks":            cmd_webhooks,
-    "webhook-create":      cmd_webhook_create,
-    "webhook-delete":      cmd_webhook_delete,
-    "export":              cmd_export,
-    "usage":               cmd_usage,
+    "scan-dir": cmd_scan_dir,
+    "scan": cmd_scan,
+    "scan-url": cmd_scan_url,
+    "scan-text": cmd_scan_text,
+    "get-scan": cmd_get_scan,
+    "batch": cmd_batch,
+    "batch-status": cmd_batch_status,
+    "batch-results": cmd_batch_results,
+    "batch-wait": cmd_batch_wait,
+    "transactions": cmd_transactions,
+    "transaction-get": cmd_transaction_get,
+    "transaction-create": cmd_transaction_create,
+    "transaction-update": cmd_transaction_update,
+    "transaction-delete": cmd_transaction_delete,
+    "import": cmd_import,
+    "summary": cmd_summary,
+    "projects": cmd_projects,
+    "project-create": cmd_project_create,
+    "project-update": cmd_project_update,
+    "project-delete": cmd_project_delete,
+    "categories": cmd_categories,
+    "category-add": cmd_category_add,
+    "category-delete": cmd_category_delete,
+    "vendors": cmd_vendors,
+    "vendor-add": cmd_vendor_add,
+    "vendor-delete": cmd_vendor_delete,
+    "rules": cmd_rules,
+    "rule-create": cmd_rule_create,
+    "rule-update": cmd_rule_update,
+    "rule-delete": cmd_rule_delete,
+    "webhooks": cmd_webhooks,
+    "webhook-create": cmd_webhook_create,
+    "webhook-delete": cmd_webhook_delete,
+    "export": cmd_export,
+    "usage": cmd_usage,
+    "bank-statements": cmd_bank_statements,
+    "bank-statement-upload": cmd_bank_statement_upload,
+    "bank-statement-get": cmd_bank_statement_get,
+    "bank-statement-delete": cmd_bank_statement_delete,
+    "bank-statement-export": cmd_bank_statement_export,
+    "bank-transactions": cmd_bank_transactions,
+    "bank-transaction-get": cmd_bank_transaction_get,
+    "bank-transaction-update": cmd_bank_transaction_update,
+    "bank-transaction-delete": cmd_bank_transaction_delete,
+    "reconciliation-links": cmd_reconciliation_links,
+    "reconciliation-link-create": cmd_reconciliation_link_create,
+    "reconciliation-link-update": cmd_reconciliation_link_update,
+    "reconciliation-link-delete": cmd_reconciliation_link_delete,
+    "reconciliation-auto-match": cmd_reconciliation_auto_match,
+    "reconciliation-summary": cmd_reconciliation_summary,
+    "reconciliation-export": cmd_reconciliation_export,
 }
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     # Backward-compat: if argv[1] looks like a path (not a known subcommand),
@@ -950,14 +1341,14 @@ def main() -> None:
         sys.argv.insert(1, "scan-dir")
 
     parser = build_parser()
-    args   = parser.parse_args()
+    args = parser.parse_args()
 
     if not args.command:
         parser.print_help()
         sys.exit(0)
 
     api_key = require_api_key()
-    client  = ReciteClient(api_key)
+    client = ReciteClient(api_key)
 
     try:
         COMMAND_MAP[args.command](args, client)
