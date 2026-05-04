@@ -1,3 +1,4 @@
+---
 name: recite
 description: AI receipt scanner & full bookkeeping automation. Scan receipts, manage transactions, run financial analytics, configure automation rules, and export data — all via the Recite API. Supports batch processing, project organization, category/vendor management, webhook automation, bank statement import, bank transaction management, and receipt-to-bank reconciliation.
 ---
@@ -24,6 +25,7 @@ As an agent, you can start executing commands immediately or load additional doc
 ### 📚 Detailed Documentation
 
 If you need detailed instructions, refer to these sub-documents:
+- **Installation:** read `docs/INSTALL.md` (Setup instructions for different agents like Codex, Claude Code, OpenClaw, Antigravity, and API key configuration)
 - **Setup & Auth:** read `docs/SETUP.md` (How to configure the API key and dependencies)
 - **Rules & Scopes:** read `docs/RULES.md` (Mandatory checks, rate limits, schema details, and API scopes)
 - **Full CLI Reference:** read `docs/COMMANDS.md` (A complete list of all supported subcommands and options)
