@@ -13,20 +13,16 @@ triggers the 'scan-dir' workflow (equivalent to running `scan-dir <dir>`).
 """
 
 import argparse
-import csv
-import glob
 import json
 import os
-import re
-import requests
 import sys
-import tempfile
-import time
-from datetime import datetime
-
-from recite_client import ReciteClient, ReciteError
 
 # ─── Constants ────────────────────────────────────────────────────────────────
+
+# Provide empty stub references to allow test mocking to continue working.
+# At runtime, these will be imported within main() or commands.
+ReciteClient = None
+ReciteError = None
 
 CONFIG_PATH = os.path.expanduser("~/.config/recite/config.json")
 CSV_NAME = "bookkeeping_transactions.CSV"
@@ -122,13 +118,13 @@ def output_failure(
     output_json(payload)
 
 
-def output_error(error: ReciteError) -> None:
+def output_error(error) -> None:
     """Print a ReciteError as a structured JSON error object."""
     output_failure(
-        code=error.code,
-        message=error.message,
-        details=error.details,
-        http_status=error.status,
+        code=getattr(error, "code", "UNKNOWN"),
+        message=getattr(error, "message", str(error)),
+        details=getattr(error, "details", {}),
+        http_status=getattr(error, "status", None),
     )
 
 
@@ -146,6 +142,7 @@ def read_ltm(skill_path: str) -> str:
 
 def get_processed_filenames(csv_path: str) -> set:
     """Return all filenames already represented in the CSV ledger."""
+    import csv
     if not os.path.exists(csv_path):
         return set()
     try:
@@ -183,6 +180,8 @@ def update_csv(csv_path: str, new_row: dict) -> None:
 
     Uses an atomic temp-file + os.replace() write to prevent data loss on crash.
     """
+    import csv
+    import tempfile
     file_exists = os.path.exists(csv_path)
     existing_data: list = []
     existing_headers: list = []
@@ -221,6 +220,8 @@ def update_csv(csv_path: str, new_row: dict) -> None:
 
 def unique_filename(target_dir: str, date: str, vendor: str, ext: str) -> str:
     """Return a collision-free filename like '2024-05-20_Starbucks.jpg'."""
+    import re
+    import time
     safe_vendor = re.sub(r'[<>:"/\\|?*]', "-", str(vendor))
     name = f"{date}_{safe_vendor}{ext}"
     path = os.path.join(target_dir, name)
@@ -238,6 +239,7 @@ def unique_filename(target_dir: str, date: str, vendor: str, ext: str) -> str:
 
 def get_receipt_files(target_dir: str) -> list[str]:
     """Return supported receipt files without case-insensitive duplicates."""
+    import glob
     files = []
     seen = set()
     for ext in SUPPORTED_EXTENSIONS:
@@ -253,8 +255,9 @@ def get_receipt_files(target_dir: str) -> list[str]:
 # ─── Subcommand: scan-dir ─────────────────────────────────────────────────────
 
 
-def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_scan_dir(args: argparse.Namespace, client) -> None:
     """Scan every receipt in a directory: rename files + append to CSV ledger."""
+    from recite_client import ReciteError
     skill_path = args.skill_path or "."
 
     ltm = read_ltm(skill_path)
@@ -342,7 +345,7 @@ def cmd_scan_dir(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: scan ─────────────────────────────────────────────────────────
 
 
-def cmd_scan(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_scan(args: argparse.Namespace, client) -> None:
     """Scan a single receipt file and print the full API response as JSON."""
     result = client.scan_file(
         args.file,
@@ -357,7 +360,7 @@ def cmd_scan(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: scan-url ─────────────────────────────────────────────────────
 
 
-def cmd_scan_url(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_scan_url(args: argparse.Namespace, client) -> None:
     """Scan a receipt image URL and print the full API response as JSON."""
     result = client.scan_url(
         args.url,
@@ -372,7 +375,7 @@ def cmd_scan_url(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: scan-text ────────────────────────────────────────────────────
 
 
-def cmd_scan_text(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_scan_text(args: argparse.Namespace, client) -> None:
     """Scan raw receipt text (read from a file or stdin) and return extracted data."""
     if args.file == "-":
         text = sys.stdin.read()
@@ -392,7 +395,7 @@ def cmd_scan_text(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: get-scan ─────────────────────────────────────────────────────
 
 
-def cmd_get_scan(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_get_scan(args: argparse.Namespace, client) -> None:
     """Retrieve a previously submitted scan by its ID."""
     output_json(client.get_scan(args.scan_id))
 
@@ -400,7 +403,7 @@ def cmd_get_scan(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: batch ────────────────────────────────────────────────────────
 
 
-def cmd_batch(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_batch(args: argparse.Namespace, client) -> None:
     """Submit up to 20 files or URLs for asynchronous batch scanning."""
     if len(args.files) > 20:
         print(
@@ -416,7 +419,7 @@ def cmd_batch(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: batch-status ─────────────────────────────────────────────────
 
 
-def cmd_batch_status(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_batch_status(args: argparse.Namespace, client) -> None:
     """Check the status of an asynchronous batch job."""
     output_json(client.get_batch_status(args.batch_id))
 
@@ -424,7 +427,7 @@ def cmd_batch_status(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: batch-results ────────────────────────────────────────────────
 
 
-def cmd_batch_results(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_batch_results(args: argparse.Namespace, client) -> None:
     """Retrieve all extraction results for a completed batch job."""
     output_json(client.get_batch_results(args.batch_id))
 
@@ -432,11 +435,12 @@ def cmd_batch_results(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: batch-wait ───────────────────────────────────────────────────
 
 
-def cmd_batch_wait(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_batch_wait(args: argparse.Namespace, client) -> None:
     """Poll a batch job until it completes, then print results.
 
     Useful for agents that want a single blocking call instead of polling manually.
     """
+    import time
     interval = max(2, args.interval)
     deadline = time.time() + args.timeout
     print(
@@ -463,7 +467,7 @@ def cmd_batch_wait(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: transactions ─────────────────────────────────────────────────
 
 
-def cmd_transactions(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_transactions(args: argparse.Namespace, client) -> None:
     """List transactions with optional filters."""
     output_json(
         client.list_transactions(
@@ -479,12 +483,12 @@ def cmd_transactions(args: argparse.Namespace, client: ReciteClient) -> None:
     )
 
 
-def cmd_transaction_get(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_transaction_get(args: argparse.Namespace, client) -> None:
     """Get a single transaction by ID."""
     output_json(client.get_transaction(args.id))
 
 
-def cmd_transaction_create(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_transaction_create(args: argparse.Namespace, client) -> None:
     """Manually create a transaction record."""
     extra = _parse_kv_list(args.extra or [])
     try:
@@ -507,13 +511,13 @@ def cmd_transaction_create(args: argparse.Namespace, client: ReciteClient) -> No
     )
 
 
-def cmd_transaction_update(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_transaction_update(args: argparse.Namespace, client) -> None:
     """Update one or more fields of an existing transaction."""
     fields = _parse_kv_list(args.fields)
     output_json(client.update_transaction(args.id, **fields))
 
 
-def cmd_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_transaction_delete(args: argparse.Namespace, client) -> None:
     """Permanently delete a transaction."""
     output_json(client.delete_transaction(args.id))
 
@@ -521,7 +525,7 @@ def cmd_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> No
 # ─── Subcommand: import ───────────────────────────────────────────────────────
 
 
-def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_import(args: argparse.Namespace, client) -> None:
     """Bulk-import up to 500 transactions from a JSON or CSV file.
 
     The JSON file must contain either a list of transaction objects or an object
@@ -552,7 +556,7 @@ def cmd_import(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: summary ──────────────────────────────────────────────────────
 
 
-def cmd_summary(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_summary(args: argparse.Namespace, client) -> None:
     """Get aggregate financial statistics."""
     output_json(
         client.get_summary(
@@ -567,30 +571,30 @@ def cmd_summary(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: projects ─────────────────────────────────────────────────────
 
 
-def cmd_projects(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_projects(args: argparse.Namespace, client) -> None:
     output_json(client.list_projects())
 
 
-def cmd_project_create(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_project_create(args: argparse.Namespace, client) -> None:
     output_json(client.create_project(args.name, description=args.description))
 
 
-def cmd_project_update(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_project_update(args: argparse.Namespace, client) -> None:
     output_json(client.update_project(args.id, **_parse_kv_list(args.fields)))
 
 
-def cmd_project_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_project_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_project(args.id))
 
 
 # ─── Subcommand: categories ───────────────────────────────────────────────────
 
 
-def cmd_categories(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_categories(args: argparse.Namespace, client) -> None:
     output_json(client.list_categories())
 
 
-def cmd_category_add(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_category_add(args: argparse.Namespace, client) -> None:
     output_json(
         client.create_category(
             args.name,
@@ -600,33 +604,33 @@ def cmd_category_add(args: argparse.Namespace, client: ReciteClient) -> None:
     )
 
 
-def cmd_category_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_category_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_category(args.name))
 
 
 # ─── Subcommand: vendors ──────────────────────────────────────────────────────
 
 
-def cmd_vendors(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_vendors(args: argparse.Namespace, client) -> None:
     output_json(client.list_vendors())
 
 
-def cmd_vendor_add(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_vendor_add(args: argparse.Namespace, client) -> None:
     output_json(client.create_vendor(args.name, category=args.category))
 
 
-def cmd_vendor_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_vendor_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_vendor(args.name))
 
 
 # ─── Subcommand: rules ────────────────────────────────────────────────────────
 
 
-def cmd_rules(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_rules(args: argparse.Namespace, client) -> None:
     output_json(client.list_rules())
 
 
-def cmd_rule_create(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_rule_create(args: argparse.Namespace, client) -> None:
     try:
         condition = json.loads(args.condition)
         action = json.loads(args.action)
@@ -644,22 +648,22 @@ def cmd_rule_create(args: argparse.Namespace, client: ReciteClient) -> None:
     )
 
 
-def cmd_rule_update(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_rule_update(args: argparse.Namespace, client) -> None:
     output_json(client.update_rule(args.id, **_parse_kv_list(args.fields)))
 
 
-def cmd_rule_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_rule_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_rule(args.id))
 
 
 # ─── Subcommand: webhooks ─────────────────────────────────────────────────────
 
 
-def cmd_webhooks(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_webhooks(args: argparse.Namespace, client) -> None:
     output_json(client.list_webhooks())
 
 
-def cmd_webhook_create(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_webhook_create(args: argparse.Namespace, client) -> None:
     invalid = [e for e in args.events if e not in VALID_EVENTS]
     if invalid:
         print(
@@ -669,14 +673,14 @@ def cmd_webhook_create(args: argparse.Namespace, client: ReciteClient) -> None:
     output_json(client.create_webhook(args.url, args.events, secret=args.secret))
 
 
-def cmd_webhook_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_webhook_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_webhook(args.id))
 
 
 # ─── Subcommand: export ───────────────────────────────────────────────────────
 
 
-def cmd_export(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_export(args: argparse.Namespace, client) -> None:
     """Export transactions. If --output is given, write content to a local file."""
     result = client.export_transactions(
         format=args.format or "csv",
@@ -701,7 +705,7 @@ def cmd_export(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: usage ────────────────────────────────────────────────────────
 
 
-def cmd_usage(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_usage(args: argparse.Namespace, client) -> None:
     """View API scan quota and request metrics."""
     output_json(client.get_usage())
 
@@ -709,7 +713,7 @@ def cmd_usage(args: argparse.Namespace, client: ReciteClient) -> None:
 # ─── Subcommand: bank-statements ──────────────────────────────────────────────
 
 
-def cmd_bank_statements(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_statements(args: argparse.Namespace, client) -> None:
     output_json(
         client.list_bank_statements(
             limit=args.limit,
@@ -718,21 +722,21 @@ def cmd_bank_statements(args: argparse.Namespace, client: ReciteClient) -> None:
     )
 
 
-def cmd_bank_statement_upload(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_statement_upload(args: argparse.Namespace, client) -> None:
     with open(args.file, encoding="utf-8") as f:
         csv_data = f.read()
     output_json(client.upload_bank_statement(csv_data))
 
 
-def cmd_bank_statement_get(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_statement_get(args: argparse.Namespace, client) -> None:
     output_json(client.get_bank_statement(args.id))
 
 
-def cmd_bank_statement_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_statement_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_bank_statement(args.id))
 
 
-def cmd_bank_statement_export(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_statement_export(args: argparse.Namespace, client) -> None:
     result = client.export_bank_statement(args.id)
     if args.output:
         content = (result.get("data") or {}).get("content", "")
@@ -749,7 +753,7 @@ def cmd_bank_statement_export(args: argparse.Namespace, client: ReciteClient) ->
 # ─── Subcommand: bank-transactions ────────────────────────────────────────────
 
 
-def cmd_bank_transactions(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_transactions(args: argparse.Namespace, client) -> None:
     output_json(
         client.list_bank_transactions(
             statement_id=getattr(args, "statement_id", None),
@@ -759,23 +763,23 @@ def cmd_bank_transactions(args: argparse.Namespace, client: ReciteClient) -> Non
     )
 
 
-def cmd_bank_transaction_get(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_transaction_get(args: argparse.Namespace, client) -> None:
     output_json(client.get_bank_transaction(args.id))
 
 
-def cmd_bank_transaction_update(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_transaction_update(args: argparse.Namespace, client) -> None:
     fields = _parse_kv_list(args.fields)
     output_json(client.update_bank_transaction(args.id, **fields))
 
 
-def cmd_bank_transaction_delete(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_bank_transaction_delete(args: argparse.Namespace, client) -> None:
     output_json(client.delete_bank_transaction(args.id))
 
 
 # ─── Subcommand: reconciliation ───────────────────────────────────────────────
 
 
-def cmd_reconciliation_links(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_reconciliation_links(args: argparse.Namespace, client) -> None:
     output_json(
         client.list_reconciliation_links(
             statement_id=getattr(args, "statement_id", None),
@@ -786,7 +790,7 @@ def cmd_reconciliation_links(args: argparse.Namespace, client: ReciteClient) -> 
 
 
 def cmd_reconciliation_link_create(
-    args: argparse.Namespace, client: ReciteClient
+    args: argparse.Namespace, client
 ) -> None:
     output_json(
         client.create_reconciliation_link(
@@ -797,29 +801,29 @@ def cmd_reconciliation_link_create(
 
 
 def cmd_reconciliation_link_update(
-    args: argparse.Namespace, client: ReciteClient
+    args: argparse.Namespace, client
 ) -> None:
     fields = _parse_kv_list(args.fields)
     output_json(client.update_reconciliation_link(args.id, **fields))
 
 
 def cmd_reconciliation_link_delete(
-    args: argparse.Namespace, client: ReciteClient
+    args: argparse.Namespace, client
 ) -> None:
     output_json(client.delete_reconciliation_link(args.id))
 
 
 def cmd_reconciliation_auto_match(
-    args: argparse.Namespace, client: ReciteClient
+    args: argparse.Namespace, client
 ) -> None:
     output_json(client.auto_match_reconciliation(args.statement_id))
 
 
-def cmd_reconciliation_summary(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_reconciliation_summary(args: argparse.Namespace, client) -> None:
     output_json(client.get_reconciliation_summary(args.statement_id))
 
 
-def cmd_reconciliation_export(args: argparse.Namespace, client: ReciteClient) -> None:
+def cmd_reconciliation_export(args: argparse.Namespace, client) -> None:
     result = client.export_reconciliation(
         statement_id=getattr(args, "statement_id", None),
         format=getattr(args, "format", None),
@@ -1347,12 +1351,22 @@ def main() -> None:
         parser.print_help()
         sys.exit(0)
 
+    # Lazy-load these so `--help` is near instantaneous
+    import requests
+    from recite_client import ReciteClient as ActualClient, ReciteError as ActualError
+
     api_key = require_api_key()
-    client = ReciteClient(api_key)
+
+    # If the test framework mocked ReciteClient globally, use it. Otherwise, use ActualClient.
+    global ReciteClient, ReciteError
+    ClientClass = ReciteClient if ReciteClient is not None else ActualClient
+    ErrorClass = ReciteError if ReciteError is not None else ActualError
+
+    client = ClientClass(api_key)
 
     try:
         COMMAND_MAP[args.command](args, client)
-    except ReciteError as e:
+    except ErrorClass as e:
         output_error(e)
         sys.exit(1)
     except ValueError as e:
