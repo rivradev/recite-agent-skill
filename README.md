@@ -3,7 +3,7 @@
 [![OpenClaw Skill](https://img.shields.io/badge/OpenClaw-Skill-blue.svg)](https://openclaw.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**AI-powered receipt scanning & automated bookkeeping agent skill for OpenClaw and Claude Code.**
+**AI-powered receipt scanning & automated bookkeeping agent skill for OpenClaw, Claude Code, Claude Cowork, Codex, and Antigravity.**
 
 Recite allows your AI agent to handle the tedious work of receipt management. It scans images and PDFs using the Recite Vision API, renames files logically, and maintains a comprehensive local CSV ledger.
 
@@ -34,6 +34,14 @@ Set your API key in your environment or a config file:
 ```bash
 pip install requests
 ```
+
+## 🤖 Supported Agents
+This skill is tested and natively supported across all modern AI coding agents, including:
+- **OpenClaw**
+- **Claude Code**
+- **Claude Cowork**
+- **Codex**
+- **Antigravity**
 
 ## 🤖 For AI Agents: How to use this Skill
 
